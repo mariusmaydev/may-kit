@@ -82,12 +82,14 @@ test('an answer without a hint leaves the state as it was', async () => {
 
 // Review 2026-11-03 (H2, N1): the test engine has no SDK session, so the fallback is driven
 // through a stand-in for `$` holding just what komprimieren calls.
-function attrappe(fehler: string) {
+function attrappe(fehler: string, runFehler?: string) {
   const befehle: unknown[] = []
   const toasts: string[] = []
   const $ = {
     session: { compact: () => Promise.reject(new Error(fehler)) },
-    command: { run: (a: unknown) => (befehle.push(a), Promise.resolve({ text: '' })) },
+    command: {
+      run: (a: unknown) => (befehle.push(a), runFehler ? Promise.reject(new Error(runFehler)) : Promise.resolve({ text: '' })),
+    },
     ui: { toast: (t: string) => void toasts.push(t) },
   }
   return { $: $ as unknown as Parameters<typeof komprimieren>[0], befehle, toasts }
@@ -105,4 +107,11 @@ test('any other error, even one naming the SDK, is reported, not retried', async
   await komprimieren(a.$, null)
   expect(a.befehle).toEqual([])
   expect(a.toasts).toEqual(['Nicht komprimiert: @anthropic-ai/sdk: 529 overloaded'])
+})
+
+test('a refused /compact command is reported', async () => {
+  const a = attrappe('not available in a headless (-p / SDK) session', 'unknown command')
+  await komprimieren(a.$, null)
+  expect(a.befehle).toEqual([{ command: 'compact', args: '' }])
+  expect(a.toasts).toEqual(['Nicht komprimiert: unknown command'])
 })

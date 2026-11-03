@@ -21,8 +21,16 @@ type Dollar = CoreEngineInterface
 // Set from the press until the action has handed over (review: the prompt accepted; compact: the
 // compaction finished). A second press inside that window would send a second review order or a
 // second /compact; the stored state only redraws after the press, so it cannot guard this.
-// A module variable on purpose: a reload starts it over, so it can never hang the buttons.
-let unterwegs: 'review' | 'compact' | null = null
+// A module variable on purpose (a reload starts it over), and it lapses after SPERRE_MS: a
+// compaction or command that never comes back must not lock the buttons for good.
+const SPERRE_MS = 30_000
+let unterwegs: { art: 'review' | 'compact'; seit: number } | null = null
+/** The action still handing over, or null once none is or the lock has lapsed. */
+const sperre = () => (unterwegs && Date.now() - unterwegs.seit < SPERRE_MS ? unterwegs.art : null)
+const sperren = (art: 'review' | 'compact') => {
+  unterwegs = { art, seit: Date.now() }
+}
+const schonUnterwegs = (art: 'review' | 'compact') => (art === 'compact' ? 'Es wird schon komprimiert' : 'Das Review wird schon gestartet')
 
 /** The "Review starten" order for a REVIEW-EMPFEHLUNG, only when it names commits. */
 export function reviewAus(antwort: string): string | null {
@@ -210,8 +218,9 @@ export const register: Register = on => {
     // the press reads the last answer itself, so the buttons never depend on what was stored.
     const reviewDruecken = async () => {
       if (arbeitet) return $.ui.toast('Claude arbeitet noch, danach nochmal')
-      if (unterwegs) return $.ui.toast(unterwegs === 'review' ? 'Das Review wird schon gestartet' : 'Es wird schon komprimiert')
-      unterwegs = 'review'
+      const r = sperre()
+      if (r) return $.ui.toast(schonUnterwegs(r))
+      sperren('review')
       const jetzt = stand && reviewBefehl ? stand : nachAntwort(null, await letzteAntwort($).catch(() => ''))
       if (!jetzt?.reviewBefehl || jetzt.phase !== 'review') {
         unterwegs = null
@@ -219,7 +228,11 @@ export const register: Register = on => {
       }
       void reviewSenden($, jetzt, jetzt.reviewBefehl) // not awaited, as with compacting below
     }
+    // A double click's second press lands here once the row redrew (the spinner keeps the
+    // button's key): while the action still hands over, it is that press, not a tick-off.
     const reviewAbhaken = () => {
+      if (sperre()) return
+      unterwegs = null
       void update($, hinweis, (alt): Hinweis | null => (alt ? { ...alt, phase: 'compact', reviewErledigt: true } : alt)).catch(() => undefined)
       $.ui.toast('Review als erledigt markiert')
     }
@@ -229,8 +242,9 @@ export const register: Register = on => {
       if (reviewDran) return $.ui.toast('Erst das Review')
       if (reviewLaeuft) return $.ui.toast('Das Review läuft noch')
       if (arbeitet) return $.ui.toast('Claude arbeitet noch, danach nochmal')
-      if (unterwegs) return $.ui.toast(unterwegs === 'compact' ? 'Es wird schon komprimiert' : 'Das Review wird schon gestartet')
-      unterwegs = 'compact'
+      const r = sperre()
+      if (r) return $.ui.toast(schonUnterwegs(r))
+      sperren('compact')
       const befehl = compactBefehl ?? compactAus(await letzteAntwort($).catch(() => ''))
       // Not awaited: a press has 10 s, a compaction takes longer (2026-11-03 "ui.press hook
       // skipped: ran past its 10s budget"). The engine lets work a press leaves running finish.
@@ -238,6 +252,8 @@ export const register: Register = on => {
     }
 
     const compactAbhaken = () => {
+      if (sperre()) return
+      unterwegs = null
       void update($, komprimiert, () => false).catch(() => undefined)
     }
 

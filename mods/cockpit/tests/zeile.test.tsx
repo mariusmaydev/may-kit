@@ -107,11 +107,17 @@ test('two quick presses on Komprimieren compact once', async ($, on) => {
     verdichtet++
     return next(e)
   })
-  on('ui.toast', () => ({ value: undefined }) as never)
+  const toasts: string[] = []
+  on('ui.toast', (_, e) => {
+    toasts.push(JSON.stringify(e))
+    return { value: undefined } as never
+  })
   await $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
 
   const ui = await $.ui.mount({ ...BAND, surface: 'vscode' })
   await Promise.all([ui.press({ key: 'compact' }), ui.press({ key: 'compact' })])
   expect(verdichtet).toBe(1)
+  // the lock turned the second press away, not a redraw onto the spinner
+  expect(toasts.join()).toContain('Es wird schon komprimiert')
   await ui.unmount()
 })
