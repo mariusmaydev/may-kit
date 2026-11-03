@@ -88,7 +88,7 @@ REVIEW-EMPFEHLUNG
 - Commits: 3f2a1b9 7c0d4e2
 ```
 
-`Commits:` nennt nur die eigenen Commits dieser Session (CLAUDE.md §5). Gestartet wird mit „Review starten" (die Mod `realesos-cockpit` schreibt den Auftrag ins Eingabefeld); dann prüft ein Subagent genau diese Commits, die Session behebt die Befunde.
+`Commits:` nennt nur die eigenen Commits dieser Session (CLAUDE.md §5). Gestartet wird mit „Review starten" (der Review-Button der Mod `realesos-cockpit` schickt den Auftrag direkt ab); dann prüft ein Subagent genau diese Commits, die Session behebt die Befunde.
 
 **Ergebnis eines Reviews** — Tabelle `Befund | Ergebnis` mit „behoben", „verworfen: <Grund>" oder „fremd: <Session>", danach die Prüfungen.
 

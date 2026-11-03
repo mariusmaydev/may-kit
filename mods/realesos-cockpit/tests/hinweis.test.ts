@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { compactAus, nachAntwort, reviewAus, startetReview } from '../hooks/register'
+import { compactAnweisung, compactAus, nachAntwort, reviewAus, startetReview } from '../hooks/register'
 
 const REVIEW = [
   'Fertig: E12.c auf Dev.',
@@ -59,6 +59,12 @@ test('after the review ran, a compact hint makes compact due with review ticked'
 test('a compact hint while the review is still open keeps review due', async () => {
   const offen = { phase: 'review' as const, reviewBefehl: '/code-review high 3f2a1b9', compactBefehl: null, reviewErledigt: false }
   expect(nachAntwort(offen, COMPACT)?.phase).toBe('review')
+})
+
+test('the compact button passes only the instructions after /compact', async () => {
+  expect(compactAnweisung('/compact Weiter E-Mail: E12.d')).toBe('Weiter E-Mail: E12.d')
+  expect(compactAnweisung('/compact ')).toBe(undefined)
+  expect(compactAnweisung(null)).toBe(undefined)
 })
 
 test('an answer without a hint leaves the state as it was', async () => {
