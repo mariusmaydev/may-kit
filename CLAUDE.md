@@ -12,7 +12,7 @@
 
 Fehlt der Style (fremde Umgebung, Codespace), gilt als Untergrenze: Ergebnis zuerst, kurze ganze Sätze, keine Werkzeug-Erzählung, keine Abschluss-Zusammenfassung; Datei:Zeile, Fehlermeldungen, Zahlen und Warnungen bleiben vollständig; ausführlich nur bei Compliance, Auth, Migrationen und destruktiven Eingriffen.
 
-Die Hinweise aus §3, §3a und §5 erscheinen nur im Fall „Ja" — sie sind Entscheidungsvorlage, nicht Zusammenfassung.
+Die Hinweise aus §3a und §5 erscheinen nur im Fall „Ja" — sie sind Entscheidungsvorlage, nicht Zusammenfassung. Die Modellzeile aus §3 steht vor jeder Umsetzung, auch wenn das Modell bleibt.
 
 ---
 
@@ -43,13 +43,23 @@ Werkzeug ist der eingebaute **Plan-Mode** (Plan schreiben, ausgeben, Freigabe ab
 
 Der Plan enthält: betroffene Dateien und Komponenten · geplante Änderungen · Schnittstellen · Datenflüsse · Abhängigkeiten · Invarianten und Constraints · Edge Cases · Risiken und Seiteneffekte · notwendige Tests · Verifikationsschritte · mögliche Regressionen. Maßstab: **ein anderes Modell muss ihn umsetzen können, ohne die Architektur neu zu entwerfen.**
 
-**Plandatei:** Lautet die Empfehlung „Modellwechsel jetzt sinnvoll: Ja" oder „Jetzt komprimieren: Ja" (§3a), wird der Plan zusätzlich als Datei geschrieben — `docs/plans/<YYYY-MM-DD>-<slug>.md`, ersatzweise ins Scratchpad — und der Pfad genannt. Der Kontext überlebt Kompaktierung und Session-Ende nicht, der Plan muss das.
+**Letzte Zeile des Plans** ist die Modellzeile nach §3 — sie steht damit schon im Freigabedialog.
+
+**Plandatei:** Empfiehlt §3 einen Wechsel („**Weiter:**") oder steht ein Komprimier-Hinweis an (§3a), wird der Plan zusätzlich als Datei geschrieben — `docs/plans/<YYYY-MM-DD>-<slug>.md`, ersatzweise ins Scratchpad — und der Pfad genannt. Der Kontext überlebt Kompaktierung und Session-Ende nicht, der Plan muss das.
 
 ---
 
 ## 3. Modellempfehlung
 
-Nach dem Plan **nicht** implementieren. Stoppen und ausgeben — aber nur, wenn ein Wechsel tatsächlich sinnvoll ist:
+**Wann:** vor **jeder Umsetzung** — vor der ersten Änderung an Code, Konfiguration oder Doku, unabhängig davon, ob eine Planungsphase lief (§1). Ausgenommen ist nur, was §1 als „keine Planungsphase" nennt, außer „Abarbeiten eines beschlossenen Plans": Dort steht die Zeile gerade. Auch „mach einfach" hebt sie nicht auf; sie kostet eine Zeile, keine Runde.
+
+**Bleibt das Modell** — genau eine Zeile, dann direkt weiterarbeiten:
+
+```
+**Modell:** Opus xhigh passt, weil <Kriterium aus der Liste unten>.
+```
+
+**Lohnt ein Wechsel** — die Antwort endet mit dem Hinweis, umgesetzt wird **nicht**; der User wechselt und schickt den Auftrag (oder drückt den Knopf „Modell" der Mod `may-kit-panel`, der `/compact`, `/model` und `/effort` ausführt und den Auftrag schickt):
 
 ````
 **Weiter:** [erst `/compact`, dann] `/model` → [Opus | Sonnet], Effort [medium | high | xhigh]. [Begründung, ein Satz.]
@@ -60,9 +70,13 @@ Plan: <Pfad> [· danach Opus-Review]
 ```
 ````
 
-Pflichtinhalt: Modell, Effort, Begründung; Plandatei, sobald eine geschrieben wurde (§2); „danach Opus-Review", wenn §5 schon absehbar „Ja" ergibt. Bleibt das laufende Modell die richtige Wahl, **entfällt der Hinweis**; ein Satz genügt („Bleibe auf Opus xhigh, weil …"). Der Komprimier-Hinweis nach §3a steht trotzdem, wenn ein Schnittpunkt erreicht ist.
+Pflichtinhalt: Modell, Effort, Begründung; Plandatei, sobald eine geschrieben wurde (§2); „danach Opus-Review", wenn §5 schon absehbar „Ja" ergibt. Die Schreibweise `/model` → <Modell>, Effort <Stufe> ist fest: Die Mod liest genau sie.
 
-**Mechanik:** Den Modellwechsel löst der User aus (`/model`). Effort ist ein persistierter Wert (`effortLevel`, per `/config`): `low | medium | high | xhigh`; `max` gibt es nur als Stufe des `/code-review`-Skills. Subagents ohne eigene `model:`-Angabe laufen auf Sonnet (`CLAUDE_CODE_SUBAGENT_MODEL` in `~/.claude/settings.json`, seit 2026-11-02) — wer einen Subagent für schwere Analyse braucht, gibt das Modell ausdrücklich mit.
+**Plan-Mode:** Der Plan endet mit der Modellzeile (§2). Steht dort „**Weiter:**", startet die Freigabe **nicht** die Umsetzung: Plandatei schreiben, den Hinweis ausgeben, Antwort beenden.
+
+**Nicht weglassen:** Die Zeile fehlt nie stillschweigend. Ein fehlender Hinweis sieht aus wie ein vergessener; deshalb steht auch „passt" ausdrücklich da. Als richtig gilt das laufende Modell nur mit einem benannten Kriterium — „ich bin ja schon da" ist keins.
+
+**Mechanik:** Den Modellwechsel löst der User aus (`/model`, oder der Knopf „Modell"). Effort ist ein persistierter Wert (`effortLevel`, per `/config`): `low | medium | high | xhigh`; `max` gibt es nur als Stufe des `/code-review`-Skills. Subagents ohne eigene `model:`-Angabe laufen auf Sonnet (`CLAUDE_CODE_SUBAGENT_MODEL` in `~/.claude/settings.json`, seit 2026-11-02) — wer einen Subagent für schwere Analyse braucht, gibt das Modell ausdrücklich mit.
 
 **Kriterien:**
 - **Sonnet medium** — mechanische, vollständig definierte Arbeit: repetitive Änderungen, Boilerplate, Umbenennungen, einfache Tests, Migration auf ein festgelegtes Interface, kleine Refactorings ohne Architekturentscheidung.
@@ -75,7 +89,7 @@ Pflichtinhalt: Modell, Effort, Begründung; Plandatei, sobald eine geschrieben w
 |---|---|
 | höchste Stufe (Stop-and-Wait / Klasse L) | Opus xhigh, **kein** Delegieren an Sonnet |
 | mittlere Stufe (autonomer Lauf mit Endprüfung / Klasse M) | Plan + Sonnet high |
-| niedrigste Stufe (vollautonom / Klasse S) | keine Planungsphase, direkt arbeiten |
+| niedrigste Stufe (vollautonom / Klasse S) | keine Planungsphase, Modellzeile, direkt arbeiten |
 
 Ohne solches Modell gilt allein die Trigger-Liste aus §1.
 
@@ -180,4 +194,4 @@ Der MCP-Server `chrome-devtools` (User-Scope, `~/.claude.json`) hängt an **eine
 
 ---
 
-*Angelegt 2026-09-03, gestrafft 2026-11-02, §3a Komprimieren 2026-11-03.*
+*Angelegt 2026-09-03, gestrafft 2026-11-02, §3a Komprimieren 2026-11-03, §3 Modellzeile vor jeder Umsetzung 2026-11-03.*

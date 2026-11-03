@@ -1,6 +1,20 @@
 import { expect, test } from 'claude-code/testing'
 
-import { compactAnweisung, compactAus, komprimieren, modusAus, modusBefehl, nachAntwort, reviewAus, startetRelease, startetReview } from '../hooks/register'
+import {
+  compactAnweisung,
+  compactAus,
+  komprimieren,
+  modellAus,
+  modellWechseln,
+  modusAus,
+  modusBefehl,
+  nachAntwort,
+  reviewAus,
+  startetRelease,
+  startetReview,
+  umsetzBefehl,
+  wahlNachAntwort,
+} from '../hooks/register'
 
 const REVIEW = [
   'Fertig: E12.c auf Dev.',
@@ -132,6 +146,90 @@ test('the mode file: only "schnell" is fast, anything else careful (CLAUDE.md)',
   expect(modusAus('Schnell')).toBe('sorgfaeltig')
   expect(modusBefehl('schnell')).toBe('Modus sorgfältig')
   expect(modusBefehl('sorgfaeltig')).toBe('Modus schnell')
+})
+
+const WEITER = [
+  '**Weiter:** erst `/compact`, dann `/model` → Sonnet, Effort high. Plan ist bindend.',
+  'Plan: `docs/plans/2026-11-03-x.md` · danach Opus-Review',
+  '',
+  '```',
+  '/compact Etappe 4 umsetzen; Grundlage docs/plans/2026-11-03-x.md §3',
+  '```',
+].join('\n')
+
+test('a Weiter hint gives model, effort, its compaction and the plan', async () => {
+  expect(modellAus(WEITER)).toEqual({
+    modell: 'sonnet',
+    effort: 'high',
+    compactBefehl: '/compact Etappe 4 umsetzen; Grundlage docs/plans/2026-11-03-x.md §3',
+    compactOffen: true,
+    plan: 'docs/plans/2026-11-03-x.md',
+  })
+  expect(modellAus('**Weiter:** `/model` → Opus, Effort xhigh. Ursache unklar.')).toEqual({
+    modell: 'opus',
+    effort: 'xhigh',
+    compactBefehl: null,
+    compactOffen: false,
+    plan: null,
+  })
+})
+
+test('staying on the model, or a compact-only hint, is no switch', async () => {
+  expect(modellAus('**Modell:** Opus xhigh passt, weil die Ursache unklar ist.')).toBe(null)
+  expect(modellAus(COMPACT)).toBe(null)
+})
+
+// After the switch's compaction the same hint is read again: it must not compact a second time.
+test('the same hint read again keeps the stored switch, a new hint replaces it', async () => {
+  const erledigt = { ...modellAus(WEITER)!, compactOffen: false }
+  expect(wahlNachAntwort(erledigt, WEITER)).toBe(erledigt)
+  expect(wahlNachAntwort(erledigt, 'Alles klar.')).toBe(erledigt)
+  expect(wahlNachAntwort(erledigt, '**Weiter:** `/model` → Opus, Effort xhigh.')?.modell).toBe('opus')
+})
+
+function wechselAttrappe(opts: { mitEffort: boolean; compactSkip?: string }) {
+  const schritte: unknown[] = []
+  const toasts: string[] = []
+  const $ = {
+    session: {
+      compact: (a: unknown) => (schritte.push({ compact: a }), Promise.resolve(opts.compactSkip ? { skip: opts.compactSkip } : {})),
+    },
+    command: {
+      run: (a: unknown) => (schritte.push(a), Promise.resolve({ text: '' })),
+      list: () => Promise.resolve(opts.mitEffort ? [{ name: 'model' }, { name: 'effort' }] : [{ name: 'model' }]),
+    },
+    prompt: { submit: (a: { text: string }) => (schritte.push({ submit: a.text }), Promise.resolve({})) },
+    state: { update: () => Promise.resolve(), read: () => Promise.resolve(null) },
+    ui: { toast: (t: string) => void toasts.push(t) },
+  }
+  return { $: $ as unknown as Parameters<typeof modellWechseln>[0], schritte, toasts }
+}
+
+test('the switch compacts first, then sets model and effort, then sends the order', async () => {
+  const a = wechselAttrappe({ mitEffort: true })
+  const wahl = modellAus(WEITER)!
+  await modellWechseln(a.$, wahl)
+  expect(a.schritte).toEqual([
+    { compact: { instructions: 'Etappe 4 umsetzen; Grundlage docs/plans/2026-11-03-x.md §3' } },
+    { command: 'model', args: 'sonnet' },
+    { command: 'effort', args: 'high' },
+    { submit: umsetzBefehl(wahl) },
+  ])
+  expect(umsetzBefehl(wahl)).toBe('Umsetzen nach Plan docs/plans/2026-11-03-x.md (jetzt Sonnet high).')
+})
+
+test('a skipped compaction stops the switch: nothing runs on the wrong model', async () => {
+  const a = wechselAttrappe({ mitEffort: true, compactSkip: 'nothing to compact' })
+  await modellWechseln(a.$, modellAus(WEITER)!)
+  expect(a.schritte).toHaveLength(1)
+  expect(a.toasts).toEqual(['Nicht komprimiert: nothing to compact'])
+})
+
+test('without an /effort command the effort is named, the switch goes on', async () => {
+  const a = wechselAttrappe({ mitEffort: false })
+  await modellWechseln(a.$, { ...modellAus(WEITER)!, compactOffen: false })
+  expect(a.schritte).toEqual([{ command: 'model', args: 'sonnet' }, { submit: 'Umsetzen nach Plan docs/plans/2026-11-03-x.md (jetzt Sonnet high).' }])
+  expect(a.toasts).toEqual(['Effort nicht gesetzt: high bitte per /config'])
 })
 
 test('a typed or sent release order counts as a release start', async () => {

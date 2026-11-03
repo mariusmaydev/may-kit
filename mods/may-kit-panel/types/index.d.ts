@@ -10,10 +10,24 @@ export type Hinweis = {
   reviewErledigt: boolean
 }
 
+/**
+ * A model switch the last "**Weiter:**" hint recommends (CLAUDE.md §3): which model and effort,
+ * whether a /compact comes first and is still to run, and the plan file the hint names.
+ */
+export type Modellwahl = {
+  modell: 'opus' | 'sonnet'
+  effort: 'low' | 'medium' | 'high' | 'xhigh'
+  compactBefehl: string | null
+  compactOffen: boolean
+  plan: string | null
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'may-kit-panel': {
       hinweis: Shaped<Hinweis | null>
+      /** The recommended model switch, until it ran or the person sent the next prompt. */
+      modellwahl: Modellwahl | null
       /** True while a compaction runs: the row shows a spinner instead of the button. */
       komprimiert: boolean
       /** The repo's working mode from `.claude/arbeitsmodus`; null where the repo has none. */
