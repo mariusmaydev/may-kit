@@ -76,7 +76,7 @@ Pflichtinhalt: Modell, Effort, Begründung; Plandatei, sobald eine geschrieben w
 
 **Nicht weglassen:** Die Zeile fehlt nie stillschweigend. Ein fehlender Hinweis sieht aus wie ein vergessener; deshalb steht auch „passt" ausdrücklich da. Als richtig gilt das laufende Modell nur mit einem benannten Kriterium — „ich bin ja schon da" ist keins.
 
-**Mechanik:** Den Modellwechsel löst der User aus (`/model`, oder der Knopf „Modell"). Effort ist ein persistierter Wert (`effortLevel`, per `/config`): `low | medium | high | xhigh`; `max` gibt es nur als Stufe des `/code-review`-Skills. Subagents ohne eigene `model:`-Angabe laufen auf Sonnet (`CLAUDE_CODE_SUBAGENT_MODEL` in `~/.claude/settings.json`, seit 2026-11-02) — wer einen Subagent für schwere Analyse braucht, gibt das Modell ausdrücklich mit.
+**Mechanik:** Den Modellwechsel löst der User aus (`/model`, oder der Knopf „Modell"). Effort setzt `/effort <stufe>` (persistiert als `effortLevel`): `low | medium | high | xhigh | max | auto`; empfohlen werden nur `medium | high | xhigh`. Subagents ohne eigene `model:`-Angabe laufen auf Sonnet (`CLAUDE_CODE_SUBAGENT_MODEL` in `~/.claude/settings.json`, seit 2026-11-02) — wer einen Subagent für schwere Analyse braucht, gibt das Modell ausdrücklich mit.
 
 **Kriterien:**
 - **Sonnet medium** — mechanische, vollständig definierte Arbeit: repetitive Änderungen, Boilerplate, Umbenennungen, einfache Tests, Migration auf ein festgelegtes Interface, kleine Refactorings ohne Architekturentscheidung.
