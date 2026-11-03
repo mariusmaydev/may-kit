@@ -6,10 +6,7 @@
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 ![Platform](https://img.shields.io/badge/install-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 
-```
- [→ Sonnet high]  [↺ Opus xhigh]  [Review]  [Komprimieren]  [Live]  [⚡]  [?]
- ❯ _
-```
+![The may-kit panel above the Claude Code prompt](docs/panel.png)
 
 Out of the box, Claude Code leaves the process up to the model: it may plan a one-line fix and dive straight into a migration, run everything on the most expensive model, review its own work by agreeing with itself, and keep dragging a bloated context from one task into the next. may-kit puts that process into three pieces that work together and lives in `~/.claude/`, so it applies in **every** repository on **every** machine.
 
