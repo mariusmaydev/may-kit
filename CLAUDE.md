@@ -132,6 +132,10 @@ OPUS-ESKALATION EMPFOHLEN
 
 Erst nach bestandenen Tests und Verifikation. **Belege vor Behauptungen:** Prüfkommandos tatsächlich ausführen und die Ausgabe lesen, bevor „fertig", „behoben" oder „grün" fällt. Der Review läuft über das **`/code-review`-Skill** mit passendem Effort, nicht als freies Drüberlesen.
 
+**Zeitpunkt:** Empfohlen wird erst, wenn keine offene Frage und kein fehlender Teil den Code der Etappe mehr ändern kann. Was offen bleiben darf, ohne das Review zu verschieben: Gerätetest, Browser-Test, Laufzeitmessung, Punkte einer späteren Etappe. Steht eine Rückfrage aus, deren Antwort den Code ändern kann, kommt zuerst die Frage, die Review-Empfehlung erst nach der Umsetzung der Antwort.
+
+**Bündeln:** Kleine Teilschritte derselben Etappe (4b, 4c …) werden gemeinsam geprüft, nicht jeder einzeln. Die Empfehlung kommt nach dem letzten Teilschritt und nennt den Umfang (Commit-Bereich oder Teilschritte). Ausnahme: Ein Teilschritt mit Auth-, RLS- oder Security-Logik, auf dem der nächste aufbaut, wird sofort geprüft.
+
 Ausgabe **nur im Fall „Ja"**:
 
 ```
