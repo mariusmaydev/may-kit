@@ -75,6 +75,8 @@ Sparsam. Ein Link mit Zeilennummer nur, wenn er etwas belegt oder der User die S
 
 Nur Komprimieren: `**Jetzt komprimieren:** <Abschnitt> fertig, Stand in <Datei>.` plus der `/compact`-Befehl im Codeblock.
 
+**Nie zusammen mit Komprimieren:** Steht in derselben Antwort eine Review-Empfehlung oder ein `**Offen:**`, entfällt der Komprimier-Hinweis (CLAUDE.md §3a: kein Schnittpunkt, solange Review oder Rückfrage offen sind). Er kommt erst, wenn Review und offene Fragen erledigt und committet sind.
+
 **Review** — fester Block, weil er als Arbeitsauftrag kopiert wird:
 
 ```
