@@ -144,7 +144,7 @@ OPUS-ESKALATION EMPFOHLEN
 
 ## 5. Review nach der Umsetzung
 
-Erst nach bestandenen Tests und Verifikation. **Belege vor Behauptungen:** Prüfkommandos tatsächlich ausführen und die Ausgabe lesen, bevor „fertig", „behoben" oder „grün" fällt.
+Erst nach bestandenen Tests und Verifikation. **Arbeitsmodus `schnell`** (Projektdatei `.claude/arbeitsmodus`): Dort entfallen die Prüfpflichten dieses Abschnitts und aus Specs, außer Datenbanktests bei Migrationen; Ergebnisse heißen dann „nicht geprüft". **Belege vor Behauptungen:** Prüfkommandos tatsächlich ausführen und die Ausgabe lesen, bevor „fertig", „behoben" oder „grün" fällt.
 
 **Zeitpunkt:** Empfohlen wird erst, wenn keine offene Frage und kein fehlender Teil den Code der Etappe mehr ändern kann. Was offen bleiben darf, ohne das Review zu verschieben: Gerätetest, Browser-Test, Laufzeitmessung, Punkte einer späteren Etappe. Steht eine Rückfrage aus, deren Antwort den Code ändern kann, kommt zuerst die Frage, die Review-Empfehlung erst nach der Umsetzung der Antwort.
 
@@ -166,7 +166,7 @@ REVIEW-EMPFEHLUNG
 **Ablauf, wenn der User „Review starten" sagt** (oder den Review-Button der Mod `may-kit-panel` drückt):
 1. **Prüfen lässt die Session einen frischen Subagent** (Agent-Tool, `model` und `effort` wie im Block). Er bekommt die SHAs aus dem `Commits:`-Block der letzten REVIEW-EMPFEHLUNG (fehlt der Block, etwa nach `/compact`, nennt die Session ihre Kandidaten und fragt nach, statt per `git log` zu raten: Commits paralleler Sessions tragen denselben Autor), die Liste „Besonders zu prüfen" und den Auftrag, genau `git show <sha>` je Commit zu prüfen, nichts sonst. Er liest den umliegenden Code, ändert nichts und liefert Befunde mit Datei:Zeile nach dem Maßstab unten.
 2. **Beheben tut die Session selbst:** jeden Befund, der ihre eigenen Dateien betrifft, mit Ursache belegt (§6). Befunde in Dateien anderer Sessions oder ohne echten Fehler werden genannt, nicht angefasst.
-3. Danach Tests, Commit (`git commit --only`), Meldung: je Befund behoben, verworfen (mit Grund) oder fremd.
+3. Danach Tests (im Modus `schnell` keine, siehe oben), Commit (`git commit --only`), Meldung: je Befund behoben, verworfen (mit Grund) oder fremd.
 
 **Kein `/code-review`, solange parallele Sessions im selben Arbeitsbaum laufen, auch nicht mit Ziel.** Das Skill kennt als Ziel nur PR, Branch oder Pfad. Ohne Ziel nimmt es den Diff gegen den Upstream samt aller ungesicherten Dateien im Arbeitsbaum, also auch die der anderen Sessions; ein Branch-Ziel bringt deren Commits mit, ein Pfad-Ziel ihre Änderungen in derselben Datei. Commit-SHAs als Argument ignoriert es (festgestellt 2026-11-03: 81 fremde Dateien statt zwei eigener Commits). Ohne parallele Sessions bleibt `/code-review` erlaubt.
 
