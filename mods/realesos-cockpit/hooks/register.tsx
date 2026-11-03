@@ -5,23 +5,32 @@ import type { Hinweis } from '../types'
 
 // realesos-cockpit — two buttons above the prompt: "Review" and "Komprimieren".
 // They follow the last answer (CLAUDE.md §3a/§5): the step that is due is
-// highlighted, a press puts its command into the prompt box. The review command
-// is taken from the "Befehl:" line of a REVIEW-EMPFEHLUNG, which names this
-// session's own commits; without it the button does nothing, because an
-// untargeted /code-review would also review the parallel sessions' files.
+// highlighted, a press puts its text into the prompt box. For the review that is
+// the order "Review starten" with the commits from the "Commits:" line of a
+// REVIEW-EMPFEHLUNG (CLAUDE.md §5: a subagent reviews exactly those commits, the
+// session fixes the findings). Without commits the button does nothing: an
+// untargeted /code-review would review the parallel sessions' files too.
 
 // The state scan needs string literals here, not a constant.
 const hinweis = atom({ plugin: 'realesos-cockpit', key: 'hinweis' } as const, null, { shape: 'hinweis-2' })
 
 type Dollar = CoreEngineInterface
 
-/** The `/code-review …` command of a REVIEW-EMPFEHLUNG, only when it names commits. */
+/** The "Review starten" order for a REVIEW-EMPFEHLUNG, only when it names commits. */
 export function reviewAus(antwort: string): string | null {
   if (!/REVIEW-EMPFEHLUNG/.test(antwort) || !/Opus-Review empfohlen:\s*Ja/i.test(antwort)) return null
-  const befehl = antwort.match(/Befehl:\s*`?(\/code-review\b[^`\n]*)`?/)?.[1]?.trim()
-  // A target is required: at least one short SHA after the optional effort.
-  return befehl && /\b[0-9a-f]{7,40}\b/.test(befehl) ? befehl : null
+  const zeile = antwort.match(/Commits:\s*([^\n]*)/)?.[1] ?? ''
+  const shas = zeile.match(/\b[0-9a-f]{7,40}\b/g) ?? []
+  if (shas.length === 0) return null
+  const m = antwort.match(/Modell\s*\/\s*Effort:\s*(Opus|Sonnet)\s*\/\s*(low|medium|high|xhigh)\b/i)
+  const modell = m?.[1] ?? 'Opus'
+  const effort = (m?.[2] ?? 'high').toLowerCase()
+  return `Review starten: Commits ${shas.join(' ')}, Subagent ${modell}/${effort}. Befunde in deinen Dateien beheben, testen, committen.`
 }
+
+/** Whether a submitted prompt starts the review. */
+export const startetReview = (text: string, befehl?: string) =>
+  befehl === 'code-review' || /^\s*Review starten\b/i.test(text)
 
 /** The `/compact …` line of a compact hint (a line of its own, as §3a prescribes), or null. */
 export function compactAus(antwort: string): string | null {
@@ -57,7 +66,7 @@ const eintragen = ($: Dollar, text: string) => void $.prompt.fill({ text, mode: 
 
 export const register: Register = on => {
   on('prompt.submit', async ($, e, next) => {
-    if (e.command?.name === 'code-review') {
+    if (startetReview(e.text, e.command?.name)) {
       await update($, hinweis, (alt): Hinweis | null => (alt && alt.phase === 'review' ? { ...alt, phase: 'review-laeuft' } : alt)).catch(() => undefined)
     }
     return next(e)

@@ -85,10 +85,12 @@ REVIEW-EMPFEHLUNG
 - Modell / Effort: Opus / high
 - Begründung: …
 - Besonders zu prüfen: …
-- Befehl: /code-review high 3f2a1b9 7c0d4e2
+- Commits: 3f2a1b9 7c0d4e2
 ```
 
-Die Zeile `Befehl:` nennt nur die eigenen Commits dieser Session (CLAUDE.md §5); die Mod `realesos-cockpit` übernimmt sie in den Review-Button.
+`Commits:` nennt nur die eigenen Commits dieser Session (CLAUDE.md §5). Gestartet wird mit „Review starten" (die Mod `realesos-cockpit` schreibt den Auftrag ins Eingabefeld); dann prüft ein Subagent genau diese Commits, die Session behebt die Befunde.
+
+**Ergebnis eines Reviews** — Tabelle `Befund | Ergebnis` mit „behoben", „verworfen: <Grund>" oder „fremd: <Session>", danach die Prüfungen.
 
 ## Ende der Antwort
 

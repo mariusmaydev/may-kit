@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { compactAus, nachAntwort, reviewAus } from '../hooks/register'
+import { compactAus, nachAntwort, reviewAus, startetReview } from '../hooks/register'
 
 const REVIEW = [
   'Fertig: E12.c auf Dev.',
@@ -9,7 +9,7 @@ const REVIEW = [
   '- Opus-Review empfohlen: Ja',
   '- Modell / Effort: Opus / xhigh',
   '- Begründung: Art. 18',
-  '- Befehl: /code-review xhigh 3f2a1b9 7c0d4e2',
+  '- Commits: 3f2a1b9 7c0d4e2',
   '```',
 ].join('\n')
 
@@ -21,13 +21,21 @@ const COMPACT = [
   '```',
 ].join('\n')
 
-test('the review command is the Befehl line with its commits', async () => {
-  expect(reviewAus(REVIEW)).toBe('/code-review xhigh 3f2a1b9 7c0d4e2')
+test('the review order names exactly the commits, model and effort of the block', async () => {
+  expect(reviewAus(REVIEW)).toBe(
+    'Review starten: Commits 3f2a1b9 7c0d4e2, Subagent Opus/xhigh. Befunde in deinen Dateien beheben, testen, committen.',
+  )
 })
 
-test('a review without commit target gives no command (it would review other sessions)', async () => {
+test('a review without commits gives no order (it would review other sessions)', async () => {
   expect(reviewAus(REVIEW.replace(' 3f2a1b9 7c0d4e2', ''))).toBe(null)
   expect(reviewAus('Kein Review nötig.')).toBe(null)
+})
+
+test('the order and /code-review both count as starting the review', async () => {
+  expect(startetReview('Review starten: Commits 3f2a1b9, Subagent Opus/high.')).toBe(true)
+  expect(startetReview('', 'code-review')).toBe(true)
+  expect(startetReview('Wie war das Review?')).toBe(false)
 })
 
 test('the compact command is the /compact line, inline mentions do not count', async () => {

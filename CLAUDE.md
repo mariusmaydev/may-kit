@@ -130,7 +130,7 @@ OPUS-ESKALATION EMPFOHLEN
 
 ## 5. Review nach der Umsetzung
 
-Erst nach bestandenen Tests und Verifikation. **Belege vor Behauptungen:** Prüfkommandos tatsächlich ausführen und die Ausgabe lesen, bevor „fertig", „behoben" oder „grün" fällt. Der Review läuft über das **`/code-review`-Skill** mit passendem Effort, nicht als freies Drüberlesen.
+Erst nach bestandenen Tests und Verifikation. **Belege vor Behauptungen:** Prüfkommandos tatsächlich ausführen und die Ausgabe lesen, bevor „fertig", „behoben" oder „grün" fällt.
 
 **Zeitpunkt:** Empfohlen wird erst, wenn keine offene Frage und kein fehlender Teil den Code der Etappe mehr ändern kann. Was offen bleiben darf, ohne das Review zu verschieben: Gerätetest, Browser-Test, Laufzeitmessung, Punkte einer späteren Etappe. Steht eine Rückfrage aus, deren Antwort den Code ändern kann, kommt zuerst die Frage, die Review-Empfehlung erst nach der Umsetzung der Antwort.
 
@@ -144,10 +144,17 @@ REVIEW-EMPFEHLUNG
 - Modell / Effort: [Opus | Sonnet] / [medium | high | xhigh]
 - Begründung:
 - Besonders zu prüfen:
-- Befehl: /code-review <effort> <sha> [<sha> …]
+- Commits: <sha> [<sha> …]
 ```
 
-**Ziel immer mit angeben.** Ohne Ziel prüft `/code-review` den Diff gegen den Upstream und, wenn der leer ist (nach jedem Push), den ganzen Arbeitsbaum, mit den ungesicherten Änderungen paralleler Sessions. Deshalb nennt `Befehl:` die eigenen Commits der Etappe als Kurz-SHAs, und nur diese. Ein Bereich `a..b` reicht nicht, weil andere Sessions dazwischen auf denselben Branch committen. Wird ein `/code-review` mit Commit-SHAs als Ziel ausgeführt, prüft es genau diese Commits (`git show <sha>` je Commit), nie den Arbeitsbaum.
+`Commits:` nennt nur die eigenen Commits der Etappe als Kurz-SHAs. Ein Bereich `a..b` reicht nicht, weil andere Sessions dazwischen auf denselben Branch committen.
+
+**Ablauf, wenn der User „Review starten" sagt** (oder den Review-Button der Mod `realesos-cockpit` drückt):
+1. **Prüfen lässt die Session einen frischen Subagent** (Agent-Tool, `model` und `effort` wie im Block). Er bekommt die SHAs, die Liste „Besonders zu prüfen" und den Auftrag, genau `git show <sha>` je Commit zu prüfen, nichts sonst. Er liest den umliegenden Code, ändert nichts und liefert Befunde mit Datei:Zeile nach dem Maßstab unten.
+2. **Beheben tut die Session selbst:** jeden Befund, der ihre eigenen Dateien betrifft, mit Ursache belegt (§6). Befunde in Dateien anderer Sessions oder ohne echten Fehler werden genannt, nicht angefasst.
+3. Danach Tests, Commit (`git commit --only`), Meldung: je Befund behoben, verworfen (mit Grund) oder fremd.
+
+**Nicht `/code-review` ohne Ziel**, solange parallele Sessions im selben Arbeitsbaum laufen: Das Skill kennt als Ziel nur PR, Branch oder Pfad und nimmt sonst den Diff gegen den Upstream, nach jedem Push also den ganzen Arbeitsbaum mit den ungesicherten Änderungen der anderen Sessions. Commit-SHAs als Argument ignoriert es (festgestellt 2026-11-03: 81 fremde Dateien statt zwei eigener Commits).
 
 **Ja bei:** systemweiten oder architektonischen Änderungen · größeren Refactorings · neuen Kernkomponenten · komplexen Datenflüssen · Agenten-, Memory- oder Orchestrierungssystemen · Concurrency und Async-Logik · Datenbankmigrationen · Security-Komponenten · kritischer Geschäftslogik (Trading, Finanzen, Abrechnung) · komplexem State-Management · vielen indirekten Abhängigkeiten · seltenen Fehlern mit großer Wirkung · **jeder Abweichung vom ursprünglichen Plan**. **Nein** bei einfachen, eindeutig überprüfbaren Implementierungen — kein Review-Theater.
 
