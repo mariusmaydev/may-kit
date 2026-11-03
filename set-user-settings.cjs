@@ -25,11 +25,13 @@ const sep = process.platform === "win32" ? ";" : ":";
 const norm = (p) => path.resolve(p).toLowerCase();
 cfg.env = cfg.env || {};
 let current = (cfg.env.CLAUDE_CODE_PLUGIN_DIRS || "").split(sep).filter(Boolean);
-// A mod renamed or removed in the repo leaves a stale entry: drop entries in the repo's
-// mods folder that no longer exist. Entries elsewhere stay untouched.
+// A mod renamed or removed in the repo leaves a stale entry, and so does the repo itself when
+// renamed (2026-11-03: claude-user-config -> may-kit): drop missing entries in the repo's mods
+// folder or in any other folder named "mods". Existing entries elsewhere stay untouched.
 const modParents = new Set(dirs.map((d) => norm(path.dirname(path.resolve(d)))));
 current = current.filter((c) => {
-  const stale = modParents.has(norm(path.dirname(c))) && !fs.existsSync(c);
+  const parent = path.dirname(c);
+  const stale = (modParents.has(norm(parent)) || path.basename(parent).toLowerCase() === "mods") && !fs.existsSync(c);
   if (stale) report.push(`entfernt  Mod ${path.basename(c)} (gibt es nicht mehr)`);
   return !stale;
 });
