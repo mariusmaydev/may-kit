@@ -170,22 +170,26 @@ export const register: Register = on => {
       </Box>
     )
 
-    const reviewDruecken = () => {
-      if (!stand || !reviewBefehl) return $.ui.toast('Kein Review empfohlen')
+    // Nothing stored (a reload or rename lost it, or the answer came before the mod loaded):
+    // the press reads the last answer itself, so the buttons never depend on what was stored.
+    const reviewDruecken = async () => {
       if (arbeitet) return $.ui.toast('Claude arbeitet noch, danach nochmal')
-      void reviewSenden($, stand, reviewBefehl)
+      const jetzt = stand && reviewBefehl ? stand : nachAntwort(null, await letzteAntwort($).catch(() => ''))
+      if (!jetzt?.reviewBefehl || jetzt.phase !== 'review') return $.ui.toast('Kein Review empfohlen')
+      await reviewSenden($, jetzt, jetzt.reviewBefehl)
     }
     const reviewAbhaken = () => {
       void update($, hinweis, (alt): Hinweis | null => (alt ? { ...alt, phase: 'compact', reviewErledigt: true } : alt)).catch(() => undefined)
       $.ui.toast('Review als erledigt markiert')
     }
-    const compactDruecken = () => {
+    // Always compacts at once (the person's choice, 2026-11-03): with the instructions of the
+    // stored hint, else of the last answer's /compact line, else with none.
+    const compactDruecken = async () => {
       if (reviewDran) return $.ui.toast('Erst das Review')
       if (reviewLaeuft) return $.ui.toast('Das Review läuft noch')
       if (arbeitet) return $.ui.toast('Claude arbeitet noch, danach nochmal')
-      // Without a hint there are no instructions: let the person add them before compacting.
-      if (!compactBefehl) return void $.prompt.fill({ text: '/compact ', mode: 'replace' }).catch(() => undefined)
-      void komprimieren($, compactBefehl)
+      const befehl = compactBefehl ?? compactAus(await letzteAntwort($).catch(() => ''))
+      await komprimieren($, befehl)
     }
 
     return (
