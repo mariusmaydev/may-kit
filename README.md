@@ -12,7 +12,7 @@ the config applies in every workspace automatically — no per-repo setup.
 |---|---|---|
 | `CLAUDE.md` | `~/.claude/CLAUDE.md` | Global working rules (planning, model choice, review) |
 | `output-styles/` | `~/.claude/output-styles/` | Custom output styles; `Marius` is the active one |
-| `mods/<name>/` | `env.CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json` | Claude Code mods, loaded by every new session; `may-kit-panel` = buttons above the prompt: Modell (follows a `**Weiter:**` hint: /compact, /model, /effort, then the order to carry out the task), Review → Komprimieren, Live (release to production, where the repo has `scripts/merge.ps1`) and ⚡ (the repo's `.claude/arbeitsmodus`: grey careful, yellow fast) |
+| `mods/<name>/` | `env.CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json` | Claude Code mods, loaded by every new session; `may-kit-panel` = buttons above the prompt: ϟ (the repo's `.claude/arbeitsmodus`: grey careful, yellow fast), Modell + Effort (follows a `**Weiter:**` hint: /compact, /model, /effort, then the order to carry out the task), ↺ (back to the model and effort from before the first switch), Review → Komprimieren, Live (release to production, where the repo has `scripts/merge.ps1`) |
 | — | `"outputStyle": "Marius"` in `~/.claude/settings.json` | Set by `install.ps1` via `set-user-settings.cjs` (needs Node); only these two keys change |
 
 New workspace or machine: give Claude [INSTALL.md](INSTALL.md); it installs everything and adapts the project.

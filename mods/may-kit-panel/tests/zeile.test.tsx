@@ -177,11 +177,86 @@ test('Live sends the release order; the lightning shows the mode and switches it
 
   await new Promise(r => setTimeout(r, 20)) // session.start reads the repo without holding the start
   const ui = await $.ui.mount({ ...BAND, surface: 'vscode' })
-  expect((await ui.find({ key: 'blitz' }))?.props.label).toBe('Schnellmodus aus')
+  // only the glyph: no label, which VS Code drew as a long button
+  const blitz = await ui.find({ key: 'blitz' })
+  expect(blitz?.props.label).toBe('ϟ')
+  expect(blitz?.props.plain).toBe(true)
   await ui.press({ key: 'blitz' })
   await ui.press({ key: 'live' })
   expect(gesendet).toEqual(['Modus schnell', 'Release nach production'])
   await ui.unmount()
+})
+
+// 2026-11-03: the switch saves the model from before it; "↺" restores that one, the first switch's.
+test('a switch saves the model before it, and the reset button restores it', async ($, on) => {
+  const befehle: string[] = []
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('prompt.submit', (_, e) => ({ text: e.text }))
+  on('ui.toast', () => ({ value: undefined }) as never)
+  on('command.list', () => ({ value: [{ name: 'model' }, { name: 'effort' }] }) as never)
+  on('command.run', (_, e) => (befehle.push(`/${e.command} ${e.args}`), { text: '' }))
+  // what the session runs on: Opus first, Sonnet after the first switch (the test host has no
+  // settings and no requests, so the effort stays unknown here)
+  let modell = 'claude-opus-5-5'
+  on('session.model', () => ({ value: modell }) as never)
+  const wahl = { modell: 'sonnet', effort: 'high', compactBefehl: null, compactOffen: false, plan: null }
+  const mem = new Map<string, { value: unknown; version: number }>([['modellwahl', { value: wahl, version: 1 }]])
+  on('state.get', (_, e, next) => (mem.has(e.key) ? ({ value: mem.get(e.key) } as never) : next(e)))
+  on('state.set', (_, e, next) => {
+    mem.delete(e.key)
+    return next(e)
+  })
+  await $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
+
+  const vorWechsel = await $.ui.mount({ ...BAND, surface: 'vscode' })
+  expect((await vorWechsel.find({ key: 'modell' }))?.props.label).toBe('→ Sonnet high')
+  expect(await vorWechsel.find({ key: 'zurueck' })).toBe(undefined)
+  await vorWechsel.press({ key: 'modell' })
+  await vorWechsel.unmount()
+  await new Promise(r => setTimeout(r, 20))
+  expect(befehle).toEqual(['/model sonnet', '/effort high'])
+
+  // a second switch keeps the first one's "vorher"
+  modell = 'claude-sonnet-5-5'
+  mem.set('modellwahl', { value: { ...wahl, effort: 'medium' }, version: 2 })
+  const zweiter = await $.ui.mount({ ...BAND, surface: 'vscode' })
+  await zweiter.press({ key: 'modell' })
+  await zweiter.unmount()
+  await new Promise(r => setTimeout(r, 20))
+
+  const mit = await $.ui.mount({ ...BAND, surface: 'vscode' })
+  expect((await mit.find({ key: 'zurueck' }))?.props.label).toBe('↺ Opus')
+  await mit.press({ key: 'zurueck' })
+  await mit.unmount()
+  await new Promise(r => setTimeout(r, 20))
+  // no effort known: only the model goes back
+  expect(befehle.slice(-1)).toEqual(['/model claude-opus-5-5'])
+
+  const danach = await $.ui.mount({ ...BAND, surface: 'vscode' })
+  expect(await danach.find({ key: 'zurueck' })).toBe(undefined)
+  await danach.unmount()
+})
+
+test('the reset button restores model and effort as saved', async ($, on) => {
+  const befehle: string[] = []
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('ui.toast', () => ({ value: undefined }) as never)
+  on('command.list', () => ({ value: [{ name: 'model' }, { name: 'effort' }] }) as never)
+  on('command.run', (_, e) => (befehle.push(`/${e.command} ${e.args}`), { text: '' }))
+  const mem = new Map<string, { value: unknown; version: number }>([['vorher', { value: { modell: 'claude-opus-5-5', effort: 'xhigh' }, version: 1 }]])
+  on('state.get', (_, e, next) => (mem.has(e.key) ? ({ value: mem.get(e.key) } as never) : next(e)))
+  on('state.set', (_, e, next) => {
+    mem.delete(e.key)
+    return next(e)
+  })
+  await $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'vscode' })
+  expect((await ui.find({ key: 'zurueck' }))?.props.label).toBe('↺ Opus xhigh')
+  await ui.press({ key: 'zurueck' })
+  await ui.unmount()
+  await new Promise(r => setTimeout(r, 20))
+  expect(befehle).toEqual(['/model claude-opus-5-5', '/effort xhigh'])
 })
 
 // 2026-11-03: VS Code draws no hover, so "?" opens the explanations beneath the row.

@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { CoreEngineInterface, ElementConstructor, Register, RenderChildren, SvgProps } from 'claude-code'
 
-import type { Hinweis, Modellwahl } from '../types'
+import type { Hinweis, Modellwahl, Vorher } from '../types'
 
 // may-kit-panel — buttons above the prompt: "Modell", "Review" and "Komprimieren" (plus Live and ⚡).
 // "Modell" follows a "**Weiter:**" hint (CLAUDE.md §3): a press runs the /compact the hint puts
@@ -18,6 +18,7 @@ import type { Hinweis, Modellwahl } from '../types'
 const hinweis = atom({ plugin: 'may-kit-panel', key: 'hinweis' } as const, null, { shape: 'hinweis-2' })
 const komprimiert = atom({ plugin: 'may-kit-panel', key: 'komprimiert' } as const, false)
 const modellwahl = atom({ plugin: 'may-kit-panel', key: 'modellwahl' } as const, null)
+const vorher = atom({ plugin: 'may-kit-panel', key: 'vorher' } as const, null)
 // The repo's working mode (`.claude/arbeitsmodus`, CLAUDE.md "Arbeitsmodus"), null where the repo has none.
 const modus = atom({ plugin: 'may-kit-panel', key: 'modus' } as const, null)
 // Whether the repo has the release script, and whether a release the Live button sent still runs.
@@ -37,7 +38,7 @@ const SPERRE_MS = 30_000
 // A double click's second press, for the tick-off on the spinner; longer, it would block the
 // way out exactly when an action hangs.
 const DOPPELKLICK_MS = 1_500
-type Sperre = { art: 'review' | 'compact' | 'release' | 'modus' | 'modell'; seit: number }
+type Sperre = { art: 'review' | 'compact' | 'release' | 'modus' | 'modell' | 'zurueck'; seit: number }
 let unterwegs: Sperre | null = null
 /** The action still handing over, or null once none is or the lock has lapsed. */
 const sperre = () => (unterwegs && Date.now() - unterwegs.seit < SPERRE_MS ? unterwegs.art : null)
@@ -55,7 +56,14 @@ const schonUnterwegs = (art: Sperre['art']) =>
     release: 'Der Release wird schon gestartet',
     modus: 'Der Modus wird schon umgestellt',
     modell: 'Das Modell wird schon gewechselt',
+    zurueck: 'Das Modell wird schon zurückgestellt',
   })[art]
+
+/** A short name for a model id or alias: `claude-opus-5-5` → `Opus`. */
+export function modellKurz(modell: string): string {
+  const m = modell.match(/opus|sonnet|haiku|fable/i)?.[0]
+  return m ? m[0].toUpperCase() + m.slice(1).toLowerCase() : modell
+}
 
 /** The model switch of a "**Weiter:**" hint (CLAUDE.md §3), or null when the answer has none. */
 export function modellAus(antwort: string): Modellwahl | null {
@@ -265,8 +273,9 @@ async function verdichten($: Dollar, befehl: string | null): Promise<boolean> {
 // Model: the steps the hint names, in its order (CLAUDE.md §3a: compact first, so the stronger
 // model still writes the summary), each as the person would type it. A step that fails stops the
 // rest: carrying out the task on the wrong model is what the button exists to prevent.
-export async function modellWechseln($: Dollar, wahl: Modellwahl, s?: Sperre) {
+export async function modellWechseln($: Dollar, wahl: Modellwahl, s?: Sperre, aktuell?: Vorher | null) {
   try {
+    await vorherMerken($, aktuell === undefined ? await aktuellLesen($) : aktuell)
     if (wahl.compactOffen && !(await verdichten($, wahl.compactBefehl))) return
     await $.command.run({ command: 'model', args: wahl.modell })
     const befehle = await $.command.list().catch(() => [])
@@ -282,6 +291,53 @@ export async function modellWechseln($: Dollar, wahl: Modellwahl, s?: Sperre) {
   }
 }
 
+// The model and effort of the main loop's last request (turn.step): what actually ran. The merged
+// settings are no stand-in for it, as a project's effortLevel hides the one /effort wrote. A module
+// variable: a reload starts it over, and until the next request the settings answer.
+let zuletzt: Vorher | null = null
+
+/** What the session runs on now: the last request's, else /model and the effort setting; null if unreadable. */
+async function aktuellLesen($: Dollar): Promise<Vorher | null> {
+  if (zuletzt) return zuletzt
+  try {
+    const modell = await $.session.model()
+    const effort = await $.settings.read({ key: 'effortLevel' }).catch(() => undefined)
+    return { modell, effort: typeof effort === 'string' ? effort : null }
+  } catch {
+    return null
+  }
+}
+
+// Only the first switch saves: after Sonnet high → Sonnet medium, "zurück" still means the
+// model the person had before the switches, not the one in between.
+async function vorherMerken($: Dollar, aktuell: Vorher | null) {
+  if (!aktuell) return
+  try {
+    if ((await read($, vorher)) === null) await update($, vorher, () => aktuell)
+  } catch {
+    // not saved: the reset button just stays away
+  }
+}
+
+/** Back to the model and effort from before the first switch; sends no order. */
+export async function modellZuruecksetzen($: Dollar, v: Vorher, s?: Sperre) {
+  try {
+    await $.command.run({ command: 'model', args: v.modell })
+    const befehle = await $.command.list().catch(() => [])
+    if (v.effort && befehle.some(c => c.name === 'effort')) await $.command.run({ command: 'effort', args: v.effort })
+    await update($, vorher, () => null).catch(() => undefined)
+    $.ui.toast(`Zurück auf ${modellKurz(v.modell)}${v.effort ? ` ${v.effort}` : ''}`)
+  } catch (err) {
+    $.ui.toast(`Nicht zurückgestellt: ${err instanceof Error ? err.message : String(err)}`)
+  } finally {
+    if (s) freigeben(s)
+  }
+}
+
+// The lightning: U+03DF (koppa), a text glyph shaped like a bolt. A Button holds only text, so
+// no SVG icon; and U+26A1 draws as an emoji, which the person does not want.
+const BLITZ = 'ϟ'
+
 // A small turning arc, grey at half strength so it reads on light and dark themes.
 const SPINNER =
   '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 16 16">' +
@@ -295,6 +351,12 @@ export const register: Register = on => {
     const r = await next(e)
     void umgebungLesen($).catch(() => undefined)
     return r
+  })
+
+  // Only watches the request go out (model, effort) and passes the stream through untouched.
+  on('turn.step', async function* ($, e, next) {
+    if (e.agentId === undefined) zuletzt = { modell: e.model, effort: typeof e.effort === 'string' ? e.effort : null }
+    return yield* next(e)
   })
 
   on('prompt.submit', async ($, e, next) => {
@@ -357,6 +419,7 @@ export const register: Register = on => {
     const schnell = modusJetzt === 'schnell'
     const hilfeOffen = await read($, hilfe)
     const wahl = await read($, modellwahl)
+    const zurueckZu = await read($, vorher)
     const els = $.ui.resolve(e)
     const { Box, Text, Button } = els
     const Svg = 'Svg' in els ? (els.Svg as ElementConstructor<SvgProps>) : undefined
@@ -428,6 +491,14 @@ export const register: Register = on => {
       void modellWechseln($, jetzt, s) // not awaited: a compaction runs past the press's 10 s
     }
     const modellName = wahl ? `${wahl.modell === 'opus' ? 'Opus' : 'Sonnet'} ${wahl.effort}` : null
+    const vorherName = zurueckZu ? `${modellKurz(zurueckZu.modell)}${zurueckZu.effort ? ` ${zurueckZu.effort}` : ''}` : null
+    const zurueckDruecken = () => {
+      if (arbeitet) return $.ui.toast('Claude arbeitet noch, danach nochmal')
+      const r = sperre()
+      if (r) return $.ui.toast(schonUnterwegs(r))
+      if (!zurueckZu) return $.ui.toast('Nichts zurückzustellen')
+      void modellZuruecksetzen($, zurueckZu, sperren('zurueck'))
+    }
 
     const liveDruecken = () => {
       if (arbeitet) return $.ui.toast('Claude arbeitet noch, danach nochmal')
@@ -453,8 +524,9 @@ export const register: Register = on => {
         'modell',
         wahl
           ? `Wechselt auf ${modellName}${wahl.compactOffen ? ' (vorher komprimieren)' : ''} und schickt den Auftrag zur Umsetzung${wahl.plan ? ` nach ${wahl.plan}` : ''}.`
-          : 'Folgt dem letzten „Weiter:“-Hinweis: /compact (falls genannt), /model, /effort, dann den Auftrag zur Umsetzung.',
+          : 'Stellt Modell und Effort nach dem letzten „Weiter:“-Hinweis um: /compact (falls genannt), /model, /effort, dann der Auftrag zur Umsetzung.',
       ],
+      ['zurueck', `Stellt Modell und Effort zurück auf ${vorherName ?? 'den Stand vor dem ersten Wechsel'}. Schickt keinen Auftrag.`],
       [
         'review',
         reviewLaeuft
@@ -481,8 +553,17 @@ export const register: Register = on => {
       ],
     ]
     // The same texts as a list beneath the row, for the buttons drawn now; "?" opens and closes it.
-    const namen: Record<string, string> = { modell: 'Modell', review: 'Review', compact: 'Komprimieren', live: 'Live', blitz: '⚡' }
-    const sichtbar = tipps.filter(([id]) => (id !== 'live' || mitRelease) && (id !== 'blitz' || modusJetzt !== null))
+    const namen: Record<string, string> = {
+      modell: 'Modell + Effort',
+      zurueck: 'Zurück',
+      review: 'Review',
+      compact: 'Komprimieren',
+      live: 'Live',
+      blitz: BLITZ,
+    }
+    const sichtbar = tipps.filter(
+      ([id]) => (id !== 'live' || mitRelease) && (id !== 'blitz' || modusJetzt !== null) && (id !== 'zurueck' || zurueckZu !== null),
+    )
     const hilfeUmschalten = () => {
       void update($, hilfe, offen => !offen).catch(() => undefined)
     }
@@ -501,16 +582,27 @@ export const register: Register = on => {
     return (
       <Box flexDirection="column">
       <Box flexDirection="row" alignItems="center" columnGap={1}>
+        {modusJetzt !== null
+          ? mitTipp(
+              'blitz',
+              // Only the glyph, no label (the person's wish, 2026-11-03: a label draws as a long button).
+              // Grey: careful mode. Yellow: fast mode, every finished change goes to production unasked.
+              <Button key="blitz" plain onPress={blitzDruecken}>
+                {schnell ? <Text color="warning">{BLITZ}</Text> : <Text dimColor>{BLITZ}</Text>}
+              </Button>,
+            )
+          : null}
         {mitTipp(
           'modell',
           <Button
             key="modell"
-            label={modellName ? `→ ${modellName}` : 'Modell'}
+            label={modellName ? `→ ${modellName}` : 'Modell + Effort'}
             variant={wahl ? 'primary' : 'secondary'}
             dimColor={!wahl}
             onPress={modellDruecken}
           />,
         )}
+        {zurueckZu ? mitTipp('zurueck', <Button key="zurueck" label={`↺ ${vorherName}`} variant="secondary" onPress={zurueckDruecken} />) : null}
         {mitTipp(
           'review',
           reviewLaeuft ? (
@@ -547,15 +639,6 @@ export const register: Register = on => {
               ) : (
                 <Button key="live" label="Live" variant="secondary" dimColor onPress={liveDruecken} />
               ),
-            )
-          : null}
-        {modusJetzt !== null
-          ? mitTipp(
-              'blitz',
-              // Grey: careful mode. Yellow: fast mode, every finished change goes to production unasked.
-              <Button key="blitz" label={schnell ? 'Schnellmodus an' : 'Schnellmodus aus'} variant="secondary" onPress={blitzDruecken}>
-                {schnell ? <Text color="warning">⚡</Text> : <Text dimColor>⚡</Text>}
-              </Button>,
             )
           : null}
         <Button key="hilfe" label={hilfeOffen ? '? schließen' : '?'} variant="secondary" dimColor onPress={hilfeUmschalten} />

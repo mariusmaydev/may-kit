@@ -59,7 +59,7 @@ Der Plan enthält: betroffene Dateien und Komponenten · geplante Änderungen ·
 **Modell:** Opus xhigh passt, weil <Kriterium aus der Liste unten>.
 ```
 
-**Lohnt ein Wechsel** — die Antwort endet mit dem Hinweis, umgesetzt wird **nicht**; der User wechselt und schickt den Auftrag (oder drückt den Knopf „Modell" der Mod `may-kit-panel`, der `/compact`, `/model` und `/effort` ausführt und den Auftrag schickt):
+**Lohnt ein Wechsel** — die Antwort endet mit dem Hinweis, umgesetzt wird **nicht**; der User wechselt und schickt den Auftrag (oder drückt den Knopf „Modell + Effort" der Mod `may-kit-panel`, der `/compact`, `/model` und `/effort` ausführt und den Auftrag schickt; „↺" stellt danach Modell und Effort von vor dem ersten Wechsel wieder her):
 
 ````
 **Weiter:** [erst `/compact`, dann] `/model` → [Opus | Sonnet], Effort [medium | high | xhigh]. [Begründung, ein Satz.]
@@ -76,7 +76,7 @@ Pflichtinhalt: Modell, Effort, Begründung; Plandatei, sobald eine geschrieben w
 
 **Nicht weglassen:** Die Zeile fehlt nie stillschweigend. Ein fehlender Hinweis sieht aus wie ein vergessener; deshalb steht auch „passt" ausdrücklich da. Als richtig gilt das laufende Modell nur mit einem benannten Kriterium — „ich bin ja schon da" ist keins.
 
-**Mechanik:** Den Modellwechsel löst der User aus (`/model`, oder der Knopf „Modell"). Effort setzt `/effort <stufe>` (persistiert als `effortLevel`): `low | medium | high | xhigh | max | auto`; empfohlen werden nur `medium | high | xhigh`. Subagents ohne eigene `model:`-Angabe laufen auf Sonnet (`CLAUDE_CODE_SUBAGENT_MODEL` in `~/.claude/settings.json`, seit 2026-11-02) — wer einen Subagent für schwere Analyse braucht, gibt das Modell ausdrücklich mit.
+**Mechanik:** Den Modellwechsel löst der User aus (`/model`, oder der Knopf „Modell + Effort"). Effort setzt `/effort <stufe>` (persistiert als `effortLevel`): `low | medium | high | xhigh | max | auto`; empfohlen werden nur `medium | high | xhigh`. Subagents ohne eigene `model:`-Angabe laufen auf Sonnet (`CLAUDE_CODE_SUBAGENT_MODEL` in `~/.claude/settings.json`, seit 2026-11-02) — wer einen Subagent für schwere Analyse braucht, gibt das Modell ausdrücklich mit.
 
 **Kriterien:**
 - **Sonnet medium** — mechanische, vollständig definierte Arbeit: repetitive Änderungen, Boilerplate, Umbenennungen, einfache Tests, Migration auf ein festgelegtes Interface, kleine Refactorings ohne Architekturentscheidung.

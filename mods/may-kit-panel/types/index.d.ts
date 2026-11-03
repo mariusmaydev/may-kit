@@ -22,12 +22,17 @@ export type Modellwahl = {
   plan: string | null
 }
 
+/** The model and effort the session ran on before the first switch: what "zurück" restores. */
+export type Vorher = { modell: string; effort: string | null }
+
 declare module 'claude-code' {
   interface PluginState {
     'may-kit-panel': {
       hinweis: Shaped<Hinweis | null>
       /** The recommended model switch, until it ran or the person sent the next prompt. */
       modellwahl: Modellwahl | null
+      /** Set by the first switch, cleared by the reset button. */
+      vorher: Vorher | null
       /** True while a compaction runs: the row shows a spinner instead of the button. */
       komprimiert: boolean
       /** The repo's working mode from `.claude/arbeitsmodus`; null where the repo has none. */

@@ -71,7 +71,7 @@ Sparsam. Ein Link mit Zeilennummer nur, wenn er etwas belegt oder der User die S
 
 Diese Zeile gilt nicht als Vorspann und fällt nicht unter „Weglassen".
 
-**Modellwechsel und Komprimieren** — ein Satz plus kopierfertiger Befehl, kein Block; die Antwort endet damit, umgesetzt wird erst danach. Die Schreibweise `/model` → <Modell>, Effort <Stufe> bleibt genau so, der Knopf „Modell" der Mod liest sie:
+**Modellwechsel und Komprimieren** — ein Satz plus kopierfertiger Befehl, kein Block; die Antwort endet damit, umgesetzt wird erst danach. Die Schreibweise `/model` → <Modell>, Effort <Stufe> bleibt genau so, der Knopf „Modell + Effort" der Mod liest sie:
 
 > **Weiter:** erst `/compact`, dann `/model` → Sonnet, Effort high. Plan ist bindend, keine Architekturentscheidung mehr offen.
 > Plan: `docs/plans/2026-11-03-support-etappe-4.md` · danach Opus-Review
