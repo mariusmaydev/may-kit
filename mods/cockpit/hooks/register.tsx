@@ -3,7 +3,7 @@ import type { CoreEngineInterface, ElementConstructor, Register, SvgProps } from
 
 import type { Hinweis } from '../types'
 
-// realesos-cockpit — two buttons above the prompt: "Review" and "Komprimieren".
+// cockpit — two buttons above the prompt: "Review" and "Komprimieren".
 // They follow the last answer (CLAUDE.md §3a/§5): the step that is due is drawn
 // as the surface's primary button, a press runs it at once. For the review that
 // is the order "Review starten" with the commits from the "Commits:" line of a
@@ -13,8 +13,8 @@ import type { Hinweis } from '../types'
 // While a review or a compaction runs, a spinner stands in for the button.
 
 // The state scan needs string literals here, not a constant.
-const hinweis = atom({ plugin: 'realesos-cockpit', key: 'hinweis' } as const, null, { shape: 'hinweis-2' })
-const komprimiert = atom({ plugin: 'realesos-cockpit', key: 'komprimiert' } as const, false)
+const hinweis = atom({ plugin: 'cockpit', key: 'hinweis' } as const, null, { shape: 'hinweis-2' })
+const komprimiert = atom({ plugin: 'cockpit', key: 'komprimiert' } as const, false)
 
 type Dollar = CoreEngineInterface
 
@@ -175,6 +175,10 @@ export const register: Register = on => {
       if (arbeitet) return $.ui.toast('Claude arbeitet noch, danach nochmal')
       void reviewSenden($, stand, reviewBefehl)
     }
+    const reviewAbhaken = () => {
+      void update($, hinweis, (alt): Hinweis | null => (alt ? { ...alt, phase: 'compact', reviewErledigt: true } : alt)).catch(() => undefined)
+      $.ui.toast('Review als erledigt markiert')
+    }
     const compactDruecken = () => {
       if (reviewDran) return $.ui.toast('Erst das Review')
       if (reviewLaeuft) return $.ui.toast('Das Review läuft noch')
@@ -187,7 +191,12 @@ export const register: Register = on => {
     return (
       <Box flexDirection="row" alignItems="center" columnGap={1}>
         {reviewLaeuft ? (
-          laedt('review-laeuft', 'Review läuft')
+          // The spinner's text is a plain button: pressed, it ticks the review off by hand,
+          // the way out when no answer reported the result (or one came before a reload).
+          <Box key="review-laeuft" flexDirection="row" alignItems="center" columnGap={1}>
+            {Svg ? <Svg source={SPINNER} alt="" width={12} height={12} /> : <Text dimColor>◌</Text>}
+            <Button key="review" label="Review läuft" plain dimColor onPress={reviewAbhaken} />
+          </Box>
         ) : (
           <Button
             key="review"

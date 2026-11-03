@@ -3,7 +3,7 @@ import { expect, test } from 'claude-code/testing'
 // Draws the button row on every surface. Guards against a render hook that
 // throws (2026-11-03: a local variable `h` shadowed the JSX factory).
 const BAND = {
-  plugin: 'realesos-cockpit',
+  plugin: 'cockpit',
   component: 'AbovePrompt',
   requestId: 'above-prompt',
   props: { hasSurvey: false, isWorking: false, maxRows: 3, bodyColumns: 80, scroll: { offset: 0, bodyRows: 3 } },
@@ -64,7 +64,12 @@ test('a press while Claude works sends nothing; once idle, one press sends the o
 
   // Drawn afresh (the seeded read did not subscribe): the spinner stands in for the button.
   const danach = await $.ui.mount({ ...BAND, surface: 'vscode' })
-  expect(await danach.find({ key: 'review' })).toBeUndefined()
-  expect((await danach.find({ type: 'Text', text: /Review läuft/ }))?.text).toBe('Review läuft')
+  expect((await danach.find({ key: 'review' }))?.props.label).toBe('Review läuft')
+  // 2026-11-03 the indicator hung after a reload; a press on it ticks the review off by hand.
+  await danach.press({ key: 'review' })
   await danach.unmount()
+  const abgehakt = await $.ui.mount({ ...BAND, surface: 'vscode' })
+  expect((await abgehakt.find({ key: 'review' }))?.props.label).toBe('✓ Review')
+  expect((await abgehakt.find({ key: 'compact' }))?.props.variant).toBe('primary')
+  await abgehakt.unmount()
 })

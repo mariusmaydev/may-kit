@@ -12,7 +12,7 @@ export type Hinweis = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'realesos-cockpit': {
+    'cockpit': {
       hinweis: Shaped<Hinweis | null>
       /** True while a compaction runs: the row shows a spinner instead of the button. */
       komprimiert: boolean

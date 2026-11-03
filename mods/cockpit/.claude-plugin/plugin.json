@@ -1,5 +1,5 @@
 {
-  "name": "realesos-cockpit",
+  "name": "cockpit",
   "version": "0.3.0",
   "description": "Two buttons above the prompt, Review and Komprimieren, following the hints of the last answer",
   "types": "./types/index.d.ts"

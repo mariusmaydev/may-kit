@@ -149,7 +149,7 @@ REVIEW-EMPFEHLUNG
 
 `Commits:` nennt nur die eigenen Commits der Etappe als Kurz-SHAs. Ein Bereich `a..b` reicht nicht, weil andere Sessions dazwischen auf denselben Branch committen.
 
-**Ablauf, wenn der User „Review starten" sagt** (oder den Review-Button der Mod `realesos-cockpit` drückt):
+**Ablauf, wenn der User „Review starten" sagt** (oder den Review-Button der Mod `cockpit` drückt):
 1. **Prüfen lässt die Session einen frischen Subagent** (Agent-Tool, `model` und `effort` wie im Block). Er bekommt die SHAs aus dem `Commits:`-Block der letzten REVIEW-EMPFEHLUNG (fehlt der Block, etwa nach `/compact`, nennt die Session ihre Kandidaten und fragt nach, statt per `git log` zu raten: Commits paralleler Sessions tragen denselben Autor), die Liste „Besonders zu prüfen" und den Auftrag, genau `git show <sha>` je Commit zu prüfen, nichts sonst. Er liest den umliegenden Code, ändert nichts und liefert Befunde mit Datei:Zeile nach dem Maßstab unten.
 2. **Beheben tut die Session selbst:** jeden Befund, der ihre eigenen Dateien betrifft, mit Ursache belegt (§6). Befunde in Dateien anderer Sessions oder ohne echten Fehler werden genannt, nicht angefasst.
 3. Danach Tests, Commit (`git commit --only`), Meldung: je Befund behoben, verworfen (mit Grund) oder fremd.
