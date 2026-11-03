@@ -1,0 +1,42 @@
+# claude-user-config
+
+User-scope configuration for Claude Code, identical on every machine and in every repository.
+
+Claude Code reads its user-scope config from `~/.claude/`. That folder is not under version control,
+so this repo holds the shared parts and `install.ps1` links them into `~/.claude/`. Once installed,
+the config applies in every workspace automatically — no per-repo setup.
+
+## Contents
+
+| Path | Linked to | Purpose |
+|---|---|---|
+| `CLAUDE.md` | `~/.claude/CLAUDE.md` | Global working rules (planning, model choice, review) |
+| `output-styles/` | `~/.claude/output-styles/` | Custom output styles, selectable via `/output-style` |
+
+## Setup on a new machine
+
+```powershell
+cd $env:USERPROFILE\Documents\GitHub
+gh repo clone mariusmaydev/claude-user-config
+cd claude-user-config
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+Existing files in `~/.claude/` are moved to `*.bak-<timestamp>` first. If the machine had its own
+`CLAUDE.md`, compare the backup with the repo version and merge differences here.
+
+## Daily use
+
+- Edit files **in this repo** (the links make `~/.claude/` see the change immediately), commit, push.
+- On the other machine: `git pull`. Changes apply from the next Claude Code session.
+
+## Rules
+
+- Never commit credentials, tokens or token prefixes.
+- Machine-specific things (paths, SSH hosts, logins, `settings.json`) stay out of this repo.
+- Project rules belong in the project's own `CLAUDE.md`; this repo only holds what applies everywhere.
+
+## Candidates for later
+
+`~/.claude/skills/`, `~/.claude/hooks/`, `~/.claude/tools/`, the `outputStyle` entry in
+`settings.json` — move them only after checking they contain nothing machine-specific.
