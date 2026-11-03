@@ -186,7 +186,7 @@ export const register: Register = on => {
       if (arbeitet) return $.ui.toast('Claude arbeitet noch, danach nochmal')
       const jetzt = stand && reviewBefehl ? stand : nachAntwort(null, await letzteAntwort($).catch(() => ''))
       if (!jetzt?.reviewBefehl || jetzt.phase !== 'review') return $.ui.toast('Kein Review empfohlen')
-      await reviewSenden($, jetzt, jetzt.reviewBefehl)
+      void reviewSenden($, jetzt, jetzt.reviewBefehl) // not awaited, as with compacting below
     }
     const reviewAbhaken = () => {
       void update($, hinweis, (alt): Hinweis | null => (alt ? { ...alt, phase: 'compact', reviewErledigt: true } : alt)).catch(() => undefined)
@@ -199,7 +199,9 @@ export const register: Register = on => {
       if (reviewLaeuft) return $.ui.toast('Das Review läuft noch')
       if (arbeitet) return $.ui.toast('Claude arbeitet noch, danach nochmal')
       const befehl = compactBefehl ?? compactAus(await letzteAntwort($).catch(() => ''))
-      await komprimieren($, befehl)
+      // Not awaited: a press has 10 s, a compaction takes longer (2026-11-03 "ui.press hook
+      // skipped: ran past its 10s budget"). The engine lets work a press leaves running finish.
+      void komprimieren($, befehl)
     }
 
     return (
