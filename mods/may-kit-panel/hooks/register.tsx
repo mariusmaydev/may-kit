@@ -3,7 +3,7 @@ import type { CoreEngineInterface, ElementConstructor, Register, RenderChildren,
 
 import type { Hinweis } from '../types'
 
-// cockpit — two buttons above the prompt: "Review" and "Komprimieren".
+// may-kit-panel — two buttons above the prompt: "Review" and "Komprimieren".
 // They follow the last answer (CLAUDE.md §3a/§5): the step that is due is drawn
 // as the surface's primary button, a press runs it at once. For the review that
 // is the order "Review starten" with the commits from the "Commits:" line of a
@@ -13,15 +13,15 @@ import type { Hinweis } from '../types'
 // While a review or a compaction runs, a spinner stands in for the button.
 
 // The state scan needs string literals here, not a constant.
-const hinweis = atom({ plugin: 'cockpit', key: 'hinweis' } as const, null, { shape: 'hinweis-2' })
-const komprimiert = atom({ plugin: 'cockpit', key: 'komprimiert' } as const, false)
+const hinweis = atom({ plugin: 'may-kit-panel', key: 'hinweis' } as const, null, { shape: 'hinweis-2' })
+const komprimiert = atom({ plugin: 'may-kit-panel', key: 'komprimiert' } as const, false)
 // The repo's working mode (`.claude/arbeitsmodus`, CLAUDE.md "Arbeitsmodus"), null where the repo has none.
-const modus = atom({ plugin: 'cockpit', key: 'modus' } as const, null)
+const modus = atom({ plugin: 'may-kit-panel', key: 'modus' } as const, null)
 // Whether the repo has the release script, and whether a release the Live button sent still runs.
-const hatRelease = atom({ plugin: 'cockpit', key: 'hatRelease' } as const, false)
-const releaseLaeuft = atom({ plugin: 'cockpit', key: 'releaseLaeuft' } as const, false)
+const hatRelease = atom({ plugin: 'may-kit-panel', key: 'hatRelease' } as const, false)
+const releaseLaeuft = atom({ plugin: 'may-kit-panel', key: 'releaseLaeuft' } as const, false)
 // Whether the "?" button has the explanations open beneath the row (VS Code draws no hover).
-const hilfe = atom({ plugin: 'cockpit', key: 'hilfe' } as const, false)
+const hilfe = atom({ plugin: 'may-kit-panel', key: 'hilfe' } as const, false)
 
 type Dollar = CoreEngineInterface
 
@@ -386,7 +386,7 @@ export const register: Register = on => {
     }
 
     const mitTipp = (id: string, inhalt: RenderChildren) => (
-      <Box key={`tipp-${id}`} hover={{ scope: `cockpit-${id}` }}>
+      <Box key={`tipp-${id}`} hover={{ scope: `may-kit-panel-${id}` }}>
         {inhalt}
       </Box>
     )
@@ -448,7 +448,7 @@ export const register: Register = on => {
           : null}
         <Button key="hilfe" label={hilfeOffen ? '? schließen' : '?'} variant="secondary" dimColor onPress={hilfeUmschalten} />
         {tipps.map(([id, text]) => (
-          <Box key={`tipptext-${id}`} display="none" hover={{ display: 'flex', scope: `cockpit-${id}` }}>
+          <Box key={`tipptext-${id}`} display="none" hover={{ display: 'flex', scope: `may-kit-panel-${id}` }}>
             <Text dimColor>{text}</Text>
           </Box>
         ))}

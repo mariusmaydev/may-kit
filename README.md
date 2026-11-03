@@ -1,4 +1,4 @@
-# claude-user-config
+# may-kit
 
 User-scope configuration for Claude Code, identical on every machine and in every repository.
 
@@ -12,8 +12,10 @@ the config applies in every workspace automatically — no per-repo setup.
 |---|---|---|
 | `CLAUDE.md` | `~/.claude/CLAUDE.md` | Global working rules (planning, model choice, review) |
 | `output-styles/` | `~/.claude/output-styles/` | Custom output styles; `Marius` is the active one |
-| `mods/<name>/` | `env.CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json` | Claude Code mods, loaded by every new session; `cockpit` = buttons above the prompt: Review → Komprimieren, Live (release to production, where the repo has `scripts/merge.ps1`) and ⚡ (the repo's `.claude/arbeitsmodus`: grey careful, yellow fast) |
+| `mods/<name>/` | `env.CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json` | Claude Code mods, loaded by every new session; `may-kit-panel` = buttons above the prompt: Review → Komprimieren, Live (release to production, where the repo has `scripts/merge.ps1`) and ⚡ (the repo's `.claude/arbeitsmodus`: grey careful, yellow fast) |
 | — | `"outputStyle": "Marius"` in `~/.claude/settings.json` | Set by `install.ps1` via `set-user-settings.cjs` (needs Node); only these two keys change |
+
+New workspace or machine: give Claude [INSTALL.md](INSTALL.md); it installs everything and adapts the project.
 
 Check a mod after editing: `claude plugin validate mods/<name>` and `claude plugin test mods/<name>`.
 
@@ -24,8 +26,8 @@ It was chosen on the selection page claude.ai/artifact/HT297XCCqrRVF6rmUcbPrY (2
 
 ```powershell
 cd $env:USERPROFILE\Documents\GitHub
-gh repo clone mariusmaydev/claude-user-config
-cd claude-user-config
+gh repo clone mariusmaydev/may-kit
+cd may-kit
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 

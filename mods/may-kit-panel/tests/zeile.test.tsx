@@ -3,7 +3,7 @@ import { expect, test } from 'claude-code/testing'
 // Draws the button row on every surface. Guards against a render hook that
 // throws (2026-11-03: a local variable `h` shadowed the JSX factory).
 const BAND = {
-  plugin: 'cockpit',
+  plugin: 'may-kit-panel',
   component: 'AbovePrompt',
   requestId: 'above-prompt',
   props: { hasSurvey: false, isWorking: false, maxRows: 3, bodyColumns: 80, scroll: { offset: 0, bodyRows: 3 } },
