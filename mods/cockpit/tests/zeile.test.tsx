@@ -184,3 +184,22 @@ test('Live sends the release order; the lightning shows the mode and switches it
   await ui.unmount()
 })
 
+// 2026-11-03: VS Code draws no hover, so "?" opens the explanations beneath the row.
+test('"?" opens the explanations beneath the row and closes them again', async ($, on) => {
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  await $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
+
+  const zu = await $.ui.mount({ ...BAND, surface: 'vscode' })
+  expect(await zu.find({ key: 'hilfe-review' })).toBe(undefined)
+  await zu.press({ key: 'hilfe' })
+  await zu.unmount()
+  const offen = await $.ui.mount({ ...BAND, surface: 'vscode' })
+  expect(await offen.find({ key: 'hilfe-review' })).not.toBe(undefined)
+  expect(await offen.find({ key: 'hilfe-compact' })).not.toBe(undefined)
+  await offen.press({ key: 'hilfe' })
+  await offen.unmount()
+  const wieder = await $.ui.mount({ ...BAND, surface: 'vscode' })
+  expect(await wieder.find({ key: 'hilfe-review' })).toBe(undefined)
+  await wieder.unmount()
+})
+

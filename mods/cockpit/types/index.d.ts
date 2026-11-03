@@ -22,6 +22,8 @@ declare module 'claude-code' {
       hatRelease: boolean
       /** True while a release the Live button (or a typed order) started still runs. */
       releaseLaeuft: boolean
+      /** Whether the "?" button has the explanations open beneath the row. */
+      hilfe: boolean
     }
   }
 }

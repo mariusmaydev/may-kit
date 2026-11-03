@@ -20,6 +20,8 @@ const modus = atom({ plugin: 'cockpit', key: 'modus' } as const, null)
 // Whether the repo has the release script, and whether a release the Live button sent still runs.
 const hatRelease = atom({ plugin: 'cockpit', key: 'hatRelease' } as const, false)
 const releaseLaeuft = atom({ plugin: 'cockpit', key: 'releaseLaeuft' } as const, false)
+// Whether the "?" button has the explanations open beneath the row (VS Code draws no hover).
+const hilfe = atom({ plugin: 'cockpit', key: 'hilfe' } as const, false)
 
 type Dollar = CoreEngineInterface
 
@@ -273,6 +275,7 @@ export const register: Register = on => {
     const mitRelease = await read($, hatRelease)
     const laeuftRelease = await read($, releaseLaeuft)
     const schnell = modusJetzt === 'schnell'
+    const hilfeOffen = await read($, hilfe)
     const els = $.ui.resolve(e)
     const { Box, Text, Button } = els
     const Svg = 'Svg' in els ? (els.Svg as ElementConstructor<SvgProps>) : undefined
@@ -375,6 +378,13 @@ export const register: Register = on => {
           : 'Schnellmodus aus (sorgfältig). Klick schaltet ein: dann geht jede fertige Änderung ungefragt und ungeprüft nach Production, für alle Sessions.',
       ],
     ]
+    // The same texts as a list beneath the row, for the buttons drawn now; "?" opens and closes it.
+    const namen: Record<string, string> = { review: 'Review', compact: 'Komprimieren', live: 'Live', blitz: '⚡' }
+    const sichtbar = tipps.filter(([id]) => (id !== 'live' || mitRelease) && (id !== 'blitz' || modusJetzt !== null))
+    const hilfeUmschalten = () => {
+      void update($, hilfe, offen => !offen).catch(() => undefined)
+    }
+
     const mitTipp = (id: string, inhalt: RenderChildren) => (
       <Box key={`tipp-${id}`} hover={{ scope: `cockpit-${id}` }}>
         {inhalt}
@@ -387,6 +397,7 @@ export const register: Register = on => {
     }
 
     return (
+      <Box flexDirection="column">
       <Box flexDirection="row" alignItems="center" columnGap={1}>
         {mitTipp(
           'review',
@@ -435,11 +446,22 @@ export const register: Register = on => {
               </Button>,
             )
           : null}
+        <Button key="hilfe" label={hilfeOffen ? '? schließen' : '?'} variant="secondary" dimColor onPress={hilfeUmschalten} />
         {tipps.map(([id, text]) => (
           <Box key={`tipptext-${id}`} display="none" hover={{ display: 'flex', scope: `cockpit-${id}` }}>
             <Text dimColor>{text}</Text>
           </Box>
         ))}
+      </Box>
+      {hilfeOffen
+        ? sichtbar.map(([id, text]) => (
+            <Box key={`hilfe-${id}`}>
+              <Text dimColor wrap="wrap">
+                {namen[id]}: {text}
+              </Text>
+            </Box>
+          ))
+        : null}
       </Box>
     )
   })
