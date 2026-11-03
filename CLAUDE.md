@@ -6,15 +6,13 @@
 
 ---
 
-## 0. Antwortlänge — gilt immer
+## 0. Antwortstil — gilt immer
 
-Knapp antworten. Ergebnis zuerst, dann nur, was zum Handeln nötig ist.
+**Wie** geantwortet wird, regelt der Output-Style `Marius` (`output-styles/marius.md` im Repo `claude-user-config`, aktiv über `"outputStyle": "Marius"` in `~/.claude/settings.json`). Diese Datei regelt, **wann** etwas gesagt wird.
 
-- Kein Vorspann, keine Wiederholung des Auftrags, keine Ankündigung des nächsten Werkzeugs, keine Abschluss-Zusammenfassung.
-- Standard sind wenige Sätze, Aufzählungen statt Absätzen. Hintergrund, Herleitung und Alternativen nur auf Nachfrage.
-- Ausnahme: Compliance, Auth, Migrationen, destruktive Eingriffe — dort darf es lang werden.
-- Kürzen kostet nie Substanz: Datei:Zeile, Fehlermeldungen, Zahlen, Einschränkungen und Warnungen bleiben vollständig.
-- Die Blöcke aus §3, §3a und §5 erscheinen nur im Fall „Ja" — sie sind Entscheidungsvorlage, nicht Zusammenfassung.
+Fehlt der Style (fremde Umgebung, Codespace), gilt als Untergrenze: Ergebnis zuerst, kurze ganze Sätze, keine Werkzeug-Erzählung, keine Abschluss-Zusammenfassung; Datei:Zeile, Fehlermeldungen, Zahlen und Warnungen bleiben vollständig; ausführlich nur bei Compliance, Auth, Migrationen und destruktiven Eingriffen.
+
+Die Hinweise aus §3, §3a und §5 erscheinen nur im Fall „Ja" — sie sind Entscheidungsvorlage, nicht Zusammenfassung.
 
 ---
 
@@ -53,18 +51,16 @@ Der Plan enthält: betroffene Dateien und Komponenten · geplante Änderungen ·
 
 Nach dem Plan **nicht** implementieren. Stoppen und ausgeben — aber nur, wenn ein Wechsel tatsächlich sinnvoll ist:
 
-```
-MODELLEMPFEHLUNG
-- Modell: [Opus | Sonnet]
-- Effort: [medium | high | xhigh]
-- Begründung: [ein bis zwei Sätze]
-- Modellwechsel jetzt sinnvoll: [Ja | Nein]
-- Plandatei: [Pfad oder —]
-- Opus-Review nach der Umsetzung empfohlen: [Ja | Nein]
-- Jetzt komprimieren: [Ja | Nein]
-```
+````
+**Weiter:** [erst `/compact`, dann] `/model` → [Opus | Sonnet], Effort [medium | high | xhigh]. [Begründung, ein Satz.]
+Plan: <Pfad> [· danach Opus-Review]
 
-Bleibt das laufende Modell die richtige Wahl, **entfällt der Block**; ein Satz genügt („Bleibe auf Opus xhigh, weil …"). Der Komprimier-Hinweis nach §3a steht trotzdem, wenn ein Schnittpunkt erreicht ist.
+```
+/compact …   ← nur wenn zugleich ein Schnittpunkt nach §3a erreicht ist
+```
+````
+
+Pflichtinhalt: Modell, Effort, Begründung; Plandatei, sobald eine geschrieben wurde (§2); „danach Opus-Review", wenn §5 schon absehbar „Ja" ergibt. Bleibt das laufende Modell die richtige Wahl, **entfällt der Hinweis**; ein Satz genügt („Bleibe auf Opus xhigh, weil …"). Der Komprimier-Hinweis nach §3a steht trotzdem, wenn ein Schnittpunkt erreicht ist.
 
 **Mechanik:** Den Modellwechsel löst der User aus (`/model`). Effort ist ein persistierter Wert (`effortLevel`, per `/config`): `low | medium | high | xhigh`; `max` gibt es nur als Stufe des `/code-review`-Skills. Subagents ohne eigene `model:`-Angabe laufen auf Sonnet (`CLAUDE_CODE_SUBAGENT_MODEL` in `~/.claude/settings.json`, seit 2026-11-02) — wer einen Subagent für schwere Analyse braucht, gibt das Modell ausdrücklich mit.
 
@@ -104,12 +100,15 @@ Komprimiert wird an einer **Abschnittsgrenze**, nicht ab einer Token-Zahl. Ziel:
 
 **Form** — am Ende der Antwort, nach dem Ergebnis:
 
+````
+**Jetzt komprimieren:** <Abschnitt> fertig, Stand in <Datei>.
+
 ```
-Jetzt komprimieren — <Abschnitt> fertig, Stand in <Datei>.
 /compact <Ziel des nächsten Abschnitts>; Grundlage <Pfad §>; offen: …; Fallen: …
 ```
+````
 
-Der `/compact`-Hinweis bleibt kurz (höchstens rund zehn Zeilen); was länger wäre, gehört in eine Datei. Fallen Komprimieren und Modellwechsel (§3) zusammen: **erst `/compact`, dann `/model`** — so schreibt noch das stärkere Modell die Zusammenfassung.
+Der Befehl steht immer in einem eigenen Codeblock, damit er kopierfertig ist, und bleibt kurz (höchstens rund zehn Zeilen); was länger wäre, gehört in eine Datei. Fallen Komprimieren und Modellwechsel (§3) zusammen, wird daraus **ein** „Weiter:"-Hinweis nach §3: **erst `/compact`, dann `/model`** — so schreibt noch das stärkere Modell die Zusammenfassung.
 
 ---
 

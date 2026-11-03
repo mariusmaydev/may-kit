@@ -53,5 +53,17 @@ foreach ($l in $links) {
     }
 }
 
+# Activate the output style in ~/.claude/settings.json. Node rewrites the JSON, because
+# PowerShell 5.1's ConvertTo-Json truncates nesting and escapes umlauts. A backup is kept.
+$outputStyle = 'Marius'
+$settings = Join-Path $target 'settings.json'
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    Write-Host "übersprungen outputStyle: node fehlt — von Hand \"outputStyle\": \"$outputStyle\" setzen"
+} else {
+    # The JS lives in its own file: PowerShell 5.1 strips quotes from inline `node -e` arguments.
+    node (Join-Path $repo 'set-output-style.cjs') $settings $outputStyle $stamp
+    if ($LASTEXITCODE -ne 0) { throw "settings.json konnte nicht gelesen werden — Sicherung liegt daneben." }
+}
+
 Write-Host ''
 Write-Host 'Fertig. Wirkt ab der nächsten Claude-Code-Session.'

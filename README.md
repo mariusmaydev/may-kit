@@ -11,7 +11,11 @@ the config applies in every workspace automatically — no per-repo setup.
 | Path | Linked to | Purpose |
 |---|---|---|
 | `CLAUDE.md` | `~/.claude/CLAUDE.md` | Global working rules (planning, model choice, review) |
-| `output-styles/` | `~/.claude/output-styles/` | Custom output styles, selectable via `/output-style` |
+| `output-styles/` | `~/.claude/output-styles/` | Custom output styles; `Marius` is the active one |
+| — | `"outputStyle": "Marius"` in `~/.claude/settings.json` | Set by `install.ps1` via `set-output-style.cjs` (needs Node); only that key changes |
+
+The style `Marius` defines **how** Claude answers; `CLAUDE.md` defines **when** a hint (model, compact, review) appears.
+It was chosen on the selection page claude.ai/artifact/HT297XCCqrRVF6rmUcbPrY (2026-11-03).
 
 ## Setup on a new machine
 
@@ -38,5 +42,5 @@ Existing files in `~/.claude/` are moved to `*.bak-<timestamp>` first. If the ma
 
 ## Candidates for later
 
-`~/.claude/skills/`, `~/.claude/hooks/`, `~/.claude/tools/`, the `outputStyle` entry in
-`settings.json` — move them only after checking they contain nothing machine-specific.
+`~/.claude/skills/`, `~/.claude/hooks/`, `~/.claude/tools/` — move them only after checking they
+contain nothing machine-specific.
