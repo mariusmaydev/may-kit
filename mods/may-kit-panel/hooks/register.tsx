@@ -334,9 +334,9 @@ export async function modellZuruecksetzen($: Dollar, v: Vorher, s?: Sperre) {
   }
 }
 
-// The mode button's word. A Button holds only text (no SVG icon), U+26A1 draws as an emoji and a
-// bolt-shaped glyph (U+03DF) looked wrong (the person, 2026-11-03): one short word, coloured.
-const BLITZ = 'Schnell'
+// The mode button: the bolt emoji (the person's choice, 2026-11-03). A Button holds only text, so
+// no SVG icon; a bolt-shaped glyph (U+03DF) and a word were tried and dropped.
+const BLITZ = '⚡'
 
 // A small turning arc, grey at half strength so it reads on light and dark themes.
 const SPINNER =
@@ -582,16 +582,6 @@ export const register: Register = on => {
     return (
       <Box flexDirection="column">
       <Box flexDirection="row" alignItems="center" columnGap={1}>
-        {modusJetzt !== null
-          ? mitTipp(
-              'blitz',
-              // One word, no "an"/"aus" (the person's wish, 2026-11-03: the label drew as a long button).
-              // Grey: careful mode. Yellow: fast mode, every finished change goes to production unasked.
-              <Button key="blitz" variant="secondary" onPress={blitzDruecken}>
-                {schnell ? <Text color="warning">{BLITZ}</Text> : <Text dimColor>{BLITZ}</Text>}
-              </Button>,
-            )
-          : null}
         {mitTipp(
           'modell',
           <Button
@@ -639,6 +629,16 @@ export const register: Register = on => {
               ) : (
                 <Button key="live" label="Live" variant="secondary" dimColor onPress={liveDruecken} />
               ),
+            )
+          : null}
+        {modusJetzt !== null
+          ? mitTipp(
+              'blitz',
+              // Right beside "?" (the person, 2026-11-03). Only the emoji, no "an"/"aus": the label
+              // drew as a long button. An emoji keeps its own colour, so the button's state says the
+              // mode: highlighted is fast mode (every finished change goes to production unasked),
+              // dim is careful mode.
+              <Button key="blitz" label={BLITZ} variant={schnell ? 'primary' : 'secondary'} dimColor={!schnell} onPress={blitzDruecken} />,
             )
           : null}
         <Button key="hilfe" label={hilfeOffen ? '? schließen' : '?'} variant="secondary" dimColor onPress={hilfeUmschalten} />
