@@ -1,6 +1,7 @@
 {
   "name": "may-kit-panel",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Buttons above the prompt (model switch, review, compact, release, working mode) that follow the hints of the last answer",
+  "author": { "name": "Marius May" },
   "types": "./types/index.d.ts"
 }

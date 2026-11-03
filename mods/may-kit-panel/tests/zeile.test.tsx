@@ -9,16 +9,18 @@ const BAND = {
   props: { hasSurvey: false, isWorking: false, maxRows: 3, bodyColumns: 80, scroll: { offset: 0, bodyRows: 3 } },
 } as const
 
-const ORDER = 'Review starten: Commits 3f2a1b9, Subagent Opus/high. Befunde in deinen Dateien beheben, testen, committen.'
+const ORDER = 'Start review: commits 3f2a1b9, subagent Opus/high. Fix findings in your files, test, commit.'
 
-test('the row shows Review and Komprimieren, on every surface', async ($, on) => {
+// Without a `language` setting the panel speaks English.
+test('the row shows Model + Effort, Review and Compact, on every surface', async ($, on) => {
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   await $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
 
   for (const surface of ['terminal', 'desktop', 'vscode', 'mobile'] as const) {
     const ui = await $.ui.mount({ ...BAND, surface })
+    expect((await ui.find({ key: 'modell' }))?.props.label).toBe('Model + Effort')
     expect((await ui.find({ key: 'review' }))?.props.label).toBe('Review')
-    expect((await ui.find({ key: 'compact' }))?.props.label).toBe('Komprimieren')
+    expect((await ui.find({ key: 'compact' }))?.props.label).toBe('Compact')
     await ui.unmount()
   }
 })
@@ -54,7 +56,7 @@ test('a press while Claude works sends nothing; once idle, one press sends the o
   expect((await busy.find({ key: 'review' }))?.props.variant).toBe('primary')
   await busy.press({ key: 'review' })
   expect(gesendet).toEqual([])
-  expect(toasts.join()).toContain('Claude arbeitet noch')
+  expect(toasts.join()).toContain('Claude is still working')
   await busy.unmount()
 
   const idle = await $.ui.mount({ ...BAND, surface: 'vscode' })
@@ -64,7 +66,7 @@ test('a press while Claude works sends nothing; once idle, one press sends the o
 
   // Drawn afresh (the seeded read did not subscribe): the spinner stands in for the button.
   const danach = await $.ui.mount({ ...BAND, surface: 'vscode' })
-  expect((await danach.find({ key: 'review' }))?.props.label).toBe('Review läuft')
+  expect((await danach.find({ key: 'review' }))?.props.label).toBe('Review running')
   // 2026-11-03 the indicator hung after a reload; a press on it ticks the review off by hand.
   await danach.press({ key: 'review' })
   await danach.unmount()
@@ -99,8 +101,8 @@ test('two quick presses on Review send the order once', async ($, on) => {
   await ui.unmount()
 })
 
-// Review 2026-11-03 (M1): two quick presses on Komprimieren compact once.
-test('two quick presses on Komprimieren compact once', async ($, on) => {
+// Review 2026-11-03 (M1): two quick presses on Compact compact once.
+test('two quick presses on Compact compact once', async ($, on) => {
   let verdichtet = 0
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.compact', (_, e, next) => {
@@ -118,7 +120,33 @@ test('two quick presses on Komprimieren compact once', async ($, on) => {
   await Promise.all([ui.press({ key: 'compact' }), ui.press({ key: 'compact' })])
   expect(verdichtet).toBe(1)
   // the lock turned the second press away, not a redraw onto the spinner
-  expect(toasts.join()).toContain('Es wird schon komprimiert')
+  expect(toasts.join()).toContain('Already compacting')
+  await ui.unmount()
+})
+
+// 2026-11-03: a review that is only due must not block Compact; the person may skip it.
+test('Compact compacts even while a review is due', async ($, on) => {
+  let verdichtet = 0
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.compact', (_, e, next) => {
+    verdichtet++
+    return next(e)
+  })
+  on('ui.toast', () => ({ value: undefined }) as never)
+  const mem = new Map<string, { value: unknown; version: number }>([
+    ['hinweis', { value: { shape: 'hinweis-2', value: { phase: 'review', reviewBefehl: ORDER, compactBefehl: null, reviewErledigt: false } }, version: 1 }],
+  ])
+  on('state.get', (_, e, next) => (mem.has(e.key) ? ({ value: mem.get(e.key) } as never) : next(e)))
+  on('state.set', (_, e, next) => {
+    mem.delete(e.key)
+    return next(e)
+  })
+  await $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'vscode' })
+  expect((await ui.find({ key: 'review' }))?.props.variant).toBe('primary')
+  await ui.press({ key: 'compact' })
+  expect(verdichtet).toBe(1)
   await ui.unmount()
 })
 
@@ -148,11 +176,11 @@ test('a second press on the spinner right after the start keeps the review runni
   await new Promise(r => setTimeout(r, 20))
   // drawn afresh as a second instance, as a redraw would (the first one is still pressed)
   const spinner = await $.ui.mount({ ...BAND, requestId: 'above-prompt-2', surface: 'vscode' })
-  expect((await spinner.find({ key: 'review' }))?.props.label).toBe('Review läuft')
+  expect((await spinner.find({ key: 'review' }))?.props.label).toBe('Review running')
   await spinner.press({ key: 'review' })
   await spinner.unmount()
   const danach = await $.ui.mount({ ...BAND, requestId: 'above-prompt-3', surface: 'vscode' })
-  expect((await danach.find({ key: 'review' }))?.props.label).toBe('Review läuft')
+  expect((await danach.find({ key: 'review' }))?.props.label).toBe('Review running')
   await danach.unmount()
   freigeben()
   await erster
@@ -171,7 +199,7 @@ test('Live sends the release order; the lightning shows the mode and switches it
   // The repo as the mod reads it: careful mode, release script present. The engine hands the
   // hooks the path resolved against the working directory.
   const pfad = (p: string) => p.split(String.fromCharCode(92)).join('/')
-  on('fs.read', (_, e, next) => (pfad(e.path).endsWith('/.claude/arbeitsmodus') ? ({ value: 'sorgfaeltig' } as never) : next(e)))
+  on('fs.read', (_, e, next) => (pfad(e.path).endsWith('/.claude/working-mode') ? ({ value: 'careful' } as never) : next(e)))
   on('fs.exists', (_, e, next) => (pfad(e.path).endsWith('/scripts/merge.ps1') ? ({ value: true } as never) : next(e)))
   await $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
 
@@ -181,6 +209,34 @@ test('Live sends the release order; the lightning shows the mode and switches it
   const blitz = await ui.find({ key: 'blitz' })
   expect(blitz?.props.label).toBe('⚡')
   expect(blitz?.props.variant).toBe('secondary')
+  await ui.press({ key: 'blitz' })
+  await ui.press({ key: 'live' })
+  expect(gesendet).toEqual(['Mode fast', 'Release to production'])
+  await ui.unmount()
+})
+
+// `language: german` switches the labels and the orders: those stay character-identical to the
+// ones the projects' CLAUDE.md files name, and the former `.claude/arbeitsmodus` is still read.
+test('with language german the row and the orders are German', async ($, on) => {
+  const gesendet: string[] = []
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('prompt.submit', (_, e) => {
+    gesendet.push(e.text)
+    return { text: e.text }
+  })
+  on('ui.toast', () => ({ value: undefined }) as never)
+  // a read of one key is the read of the merged object, projected; nothing sits beneath the
+  // test's hooks, so the hook answers the settings object itself
+  on('settings.read', () => ({ value: { language: 'german' } }) as never)
+  const pfad = (p: string) => p.split(String.fromCharCode(92)).join('/')
+  on('fs.read', (_, e, next) => (pfad(e.path).endsWith('/.claude/arbeitsmodus') ? ({ value: 'sorgfaeltig' } as never) : next(e)))
+  on('fs.exists', (_, e, next) => (pfad(e.path).endsWith('/scripts/merge.ps1') ? ({ value: true } as never) : next(e)))
+  await $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
+
+  await new Promise(r => setTimeout(r, 20))
+  const ui = await $.ui.mount({ ...BAND, surface: 'vscode' })
+  expect((await ui.find({ key: 'modell' }))?.props.label).toBe('Modell + Effort')
+  expect((await ui.find({ key: 'compact' }))?.props.label).toBe('Komprimieren')
   await ui.press({ key: 'blitz' })
   await ui.press({ key: 'live' })
   expect(gesendet).toEqual(['Modus schnell', 'Release nach production'])

@@ -48,12 +48,14 @@ Project rules always win: a repository's own `CLAUDE.md` overrides this one, and
 Result first, short whole sentences, no narration of which file gets read next, no closing summary. What is never cut: `file:line`, error messages, numbers and warnings. Hints about the model, compacting and review always appear in the same fixed shape — that's what makes the panel possible:
 
 ````
-**Weiter:** erst `/compact`, dann `/model` → Sonnet, Effort high. Plan ist bindend.
-Plan: `docs/plans/2026-11-03-checkout.md` · danach Opus-Review
+**Next:** first `/compact`, then `/model` → Sonnet, Effort high. The plan is binding.
+Plan: `docs/plans/2026-11-03-checkout.md` · then Opus review
 ```
-/compact Etappe 4 umsetzen; Grundlage docs/plans/…-checkout.md §3
+/compact Implement stage 4; basis docs/plans/…-checkout.md §3
 ```
 ````
+
+The markers (`**Next:**`, `**Model:**`, `**Compact now:**`, `REVIEW RECOMMENDATION`, `Plan:`) stay in English whatever language Claude answers in; the panel reads exactly them.
 
 ### 3. Panel — `may-kit-panel`
 
@@ -61,21 +63,23 @@ A Claude Code mod that reads the last answer after every turn and highlights the
 
 | Button | Shows | On click |
 |---|---|---|
-| **Modell + Effort** | always; highlighted after a `**Weiter:**` hint | runs the hint's `/compact` (if any), `/model`, `/effort`, then sends the order to carry out the plan |
+| **Model + Effort** | always; highlighted after a `**Next:**` hint | runs the hint's `/compact` (if any), `/model`, `/effort`, then sends the order to carry out the plan |
 | **↺** | after a switch | restores the model and effort from before the first switch |
-| **Review** | always; highlighted after a `REVIEW-EMPFEHLUNG` | sends *"Review starten"* with the recommended commits; a subagent reviews, the session fixes |
-| **Komprimieren** | always; highlighted after a compact hint | compacts with the instructions from the last `/compact` line |
-| **Live** | if the repo has `scripts/merge.ps1` | sends *"Release nach production"*; the project's `CLAUDE.md` defines what that means |
-| **⚡** | if the repo has `.claude/arbeitsmodus` | toggles careful mode and fast mode for all sessions |
+| **Review** | always; highlighted after a `REVIEW RECOMMENDATION` | sends *"Start review"* with the recommended commits; a subagent reviews, the session fixes |
+| **Compact** | always; highlighted after a compact hint | compacts with the instructions from the last `/compact` line |
+| **Live** | if the repo has `scripts/merge.ps1` | sends *"Release to production"*; the project's `CLAUDE.md` defines what that means |
+| **⚡** | if the repo has `.claude/working-mode` | toggles careful mode and fast mode for all sessions |
 | **?** | always | explains every visible button below the row |
 
 While a review, compaction or release runs, a spinner stands in for the button; clicking it clears the indicator by hand.
+
+The panel speaks the language of your `language` setting: German buttons, messages and orders for `german`, English for everything else. German orders are *"Review starten"*, *"Release nach production"* and *"Modus schnell"* / *"Modus sorgfältig"*; the older German markers (`**Weiter:**`, `REVIEW-EMPFEHLUNG`, `.claude/arbeitsmodus`) are still recognised.
 
 ## Quick start
 
 **Let Claude do it.** In any Claude Code session:
 
-> Richte may-kit ein, nach https://github.com/mariusmaydev/may-kit/blob/main/INSTALL.md
+> Set up may-kit following https://github.com/mariusmaydev/may-kit/blob/main/INSTALL.md
 
 Claude installs everything, checks it, and offers to set up the optional project parts (working mode, release button).
 
@@ -97,12 +101,12 @@ ln -s ~/may-kit/output-styles ~/.claude/output-styles
 node ~/may-kit/set-user-settings.cjs ~/.claude/settings.json "$(date +%Y%m%d%H%M%S)" Marius ~/may-kit/mods/may-kit-panel
 ```
 
-The installer links `CLAUDE.md` and `output-styles/` into `~/.claude/`, backs up whatever was there as `*.bak-<timestamp>`, and changes exactly two keys in `~/.claude/settings.json`: `outputStyle` and `env.CLAUDE_CODE_PLUGIN_DIRS`. Open a **new** chat afterwards — style and mod load at session start.
+The installer links `CLAUDE.md` and `output-styles/` into `~/.claude/`, backs up whatever was there as `*.bak-<timestamp>`, and changes exactly three keys in `~/.claude/settings.json`: `outputStyle`, `env.CLAUDE_CODE_PLUGIN_DIRS` and — only if it isn't set yet — `language`, taken from your system language (on Windows the display language, elsewhere `LC_ALL` / `LC_MESSAGES` / `LANG`). Open a **new** chat afterwards — style and mod load at session start.
 
 ## Make it yours
 
 - **Fork it.** The files are linked, not copied: edit them in your clone, commit, and `git pull` on your other machines.
-- **Language.** Rules and style are written in German, and Claude answers in German. Claude follows the rules just as well in any language; to get English answers, change the *Sprache* section of the style. If you translate the hints, keep the markers the panel looks for (`**Weiter:**`, `Jetzt komprimieren`, `REVIEW-EMPFEHLUNG`, `Commits:`) or adjust the patterns in [`register.tsx`](mods/may-kit-panel/hooks/register.tsx).
+- **Language.** English is the default. On a German, Czech or any other system the installer sets `"language"` in `~/.claude/settings.json` (`german`, `czech`, …), and Claude Code then answers and works in that language. The rules and the style stay in English; Claude follows them in any language. To pick a language yourself, set `"language": "english"` (or any other) in `~/.claude/settings.json` — the installer never overwrites an existing value, and sets nothing on an English system. The hint markers (`**Next:**`, `REVIEW RECOMMENDATION`, `Commits:` …) stay in English in every language, because the panel reads exactly them; the panel's own buttons and orders are available in English and German, see [`register.tsx`](mods/may-kit-panel/hooks/register.tsx) to add another.
 - **Machine-specific parts.** §7 of `CLAUDE.md` describes a shared Chrome setup on my own machine; drop it or replace it with yours.
 - **Model names.** The rules speak of Opus and Sonnet with effort levels `medium | high | xhigh`; rename them if your lineup differs.
 

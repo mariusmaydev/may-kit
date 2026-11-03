@@ -11,8 +11,9 @@ export type Hinweis = {
 }
 
 /**
- * A model switch the last "**Weiter:**" hint recommends (CLAUDE.md §3): which model and effort,
- * whether a /compact comes first and is still to run, and the plan file the hint names.
+ * A model switch the last "**Next:**" hint recommends (CLAUDE.md §3; the former "**Weiter:**" counts
+ * too): which model and effort, whether a /compact comes first and is still to run, and the plan
+ * file the hint names.
  */
 export type Modellwahl = {
   modell: 'opus' | 'sonnet'
@@ -22,8 +23,11 @@ export type Modellwahl = {
   plan: string | null
 }
 
-/** The model and effort the session ran on before the first switch: what "zurück" restores. */
+/** The model and effort the session ran on before the first switch: what the "↺" button restores. */
 export type Vorher = { modell: string; effort: string | null }
+
+/** The panel's language: German when the `language` setting says so, English otherwise. */
+export type Sprache = 'de' | 'en'
 
 declare module 'claude-code' {
   interface PluginState {
@@ -35,7 +39,7 @@ declare module 'claude-code' {
       vorher: Vorher | null
       /** True while a compaction runs: the row shows a spinner instead of the button. */
       komprimiert: boolean
-      /** The repo's working mode from `.claude/arbeitsmodus`; null where the repo has none. */
+      /** The repo's working mode from `.claude/working-mode` (or `.claude/arbeitsmodus`); null where the repo has none. */
       modus: 'schnell' | 'sorgfaeltig' | null
       /** Whether the repo has `scripts/merge.ps1`: only then the row shows the Live button. */
       hatRelease: boolean
@@ -43,6 +47,8 @@ declare module 'claude-code' {
       releaseLaeuft: boolean
       /** Whether the "?" button has the explanations open beneath the row. */
       hilfe: boolean
+      /** The language of the panel's texts and orders, from the `language` setting; "en" until read. */
+      sprache: Sprache
     }
   }
 }

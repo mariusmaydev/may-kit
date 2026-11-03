@@ -1,197 +1,199 @@
-# CLAUDE.md — Globale Arbeitsweise (User-Scope)
+# CLAUDE.md — Global working rules (user scope)
 
-**Geltung:** alle Projekte, alle Repositories, alle Sessions. **Vorrang:** Eine Projekt-`CLAUDE.md` schlägt diese Datei; wo ein Projekt eigene Regeln für Autonomie, Risikoklassen, Antwortformat oder Gates hat, gelten dessen Regeln, diese Datei füllt die Lücken. Rangfolge bei Konflikt: Projekt-`CLAUDE.md` > diese Datei > Skills > Plugins > Standardverhalten.
+**Scope:** all projects, all repositories, all sessions. **Precedence:** A project's `CLAUDE.md` beats this file; where a project has its own rules for autonomy, risk classes, answer format or gates, those rules apply and this file fills the gaps. Order on conflict: project `CLAUDE.md` > this file > skills > plugins > default behavior.
 
-**Zweck:** das stärkere Modell dort, wo Architekturverständnis und Fehleranalyse zählen — das schnellere dort, wo ein guter Plan nur noch ausgeführt wird. Ziel ist das beste Verhältnis aus Qualität, Zuverlässigkeit, Geschwindigkeit und Modelleinsatz, nicht maximaler Prozess.
-
----
-
-## 0. Antwortstil — gilt immer
-
-**Wie** geantwortet wird, regelt der Output-Style `Marius` (`output-styles/marius.md` im Repo `may-kit`, aktiv über `"outputStyle": "Marius"` in `~/.claude/settings.json`). Diese Datei regelt, **wann** etwas gesagt wird.
-
-Fehlt der Style (fremde Umgebung, Codespace), gilt als Untergrenze: Ergebnis zuerst, kurze ganze Sätze, keine Werkzeug-Erzählung, keine Abschluss-Zusammenfassung; Datei:Zeile, Fehlermeldungen, Zahlen und Warnungen bleiben vollständig; ausführlich nur bei Compliance, Auth, Migrationen und destruktiven Eingriffen.
-
-Die Hinweise aus §3a und §5 erscheinen nur im Fall „Ja" — sie sind Entscheidungsvorlage, nicht Zusammenfassung. Die Modellzeile aus §3 steht vor jeder Umsetzung, auch wenn das Modell bleibt.
+**Purpose:** the stronger model where architectural understanding and error analysis count — the faster one where a good plan only has to be carried out. The goal is the best ratio of quality, reliability, speed and model use, not maximum process.
 
 ---
 
-## 1. Wann geplant wird
+## 0. Answer style — always applies
 
-Planungsphase ist **Pflicht**, sobald einer dieser Punkte zutrifft — ODER-Liste, kein Ermessen:
+**How** to answer is governed by the output style `Marius` (`output-styles/marius.md` in the `may-kit` repo, active through `"outputStyle": "Marius"` in `~/.claude/settings.json`). This file governs **when** something is said.
 
-- die Änderung berührt **≥ 3 Dateien** oder mehrere Komponenten
-- **Datenbank:** Migration, Schemaänderung, RLS-Policy, Trigger
-- **Auth, Berechtigungen, Security** in jeder Form
-- **Foundation-Code:** Design-System-Primitive, geteilte Hooks, zentrale Utilities — alles mit vielen Aufrufern
-- **Concurrency, Async-Verhalten, State-Management** über Komponentengrenzen hinweg
-- **Geld-, Abrechnungs- oder sonstige kritische Geschäftslogik**
-- die **Fehlerursache ist nicht verstanden** (Symptom bekannt, Ursache nicht)
-- ein **neues Pattern** entsteht: erste Migration eines Typs, neue Testart, neue Schnittstelle nach außen
+**Answer language:** the `language` setting if there is one (the installer sets it from the system language), otherwise the language the user writes in; English by default. The fixed markers of §3, §3a, §4 and §5 (`**Model:**`, `**Next:**`, `**Compact now:**`, `REVIEW RECOMMENDATION` and its field names, `Plan:`, `OPUS ESCALATION RECOMMENDED`, the `| Finding | Result |` table, the `/model` → … command form) are written **verbatim in every language**: the `may-kit-panel` mod reads exactly them. Everything around them is translated.
 
-**Keine Planungsphase** bei: Einzeldatei-Änderung mit klarem Ziel, Textkorrektur, Umbenennung, Formatierung, Abarbeiten eines beschlossenen Plans, reiner Recherchefrage.
+If the style is missing (foreign environment, codespace), the floor is: result first, short whole sentences, no narration of tool use, no closing summary; file:line, error messages, numbers and warnings stay complete; detailed only for compliance, auth, migrations and destructive operations.
 
-**Escape:** Sagt der User „mach einfach", „direkt umsetzen" oder Vergleichbares, entfällt die Phase — auch bei erfülltem Trigger. Ausnahme: Migration, Auth und Security bleiben planungspflichtig, der Plan wird dort auf das Nötigste gekürzt.
-
-Diese Liste **schlägt die Selbsteinschätzung**: Ein Modell, das eine Ursache nicht verstanden hat, hält den Fall typischerweise für klar.
+The hints from §3a and §5 appear only in the "Yes" case — they are a decision template, not a summary. The model line from §3 comes before every implementation, even if the model stays.
 
 ---
 
-## 2. Planungsphase
+## 1. When to plan
 
-Werkzeug ist der eingebaute **Plan-Mode** (Plan schreiben, ausgeben, Freigabe abwarten) — kein separater Mechanismus daneben. Erst lesen, dann planen: betroffener Code, Architektur, Konventionen, Abhängigkeiten. Alle wesentlichen Architektur- und Designentscheidungen fallen **hier**, nicht während der Umsetzung.
+A planning phase is **mandatory** as soon as one of these points applies — an OR list, no discretion:
 
-Der Plan enthält: betroffene Dateien und Komponenten · geplante Änderungen · Schnittstellen · Datenflüsse · Abhängigkeiten · Invarianten und Constraints · Edge Cases · Risiken und Seiteneffekte · notwendige Tests · Verifikationsschritte · mögliche Regressionen. Maßstab: **ein anderes Modell muss ihn umsetzen können, ohne die Architektur neu zu entwerfen.**
+- the change touches **≥ 3 files** or several components
+- **Database:** migration, schema change, RLS policy, trigger
+- **Auth, permissions, security** in any form
+- **Foundation code:** design-system primitives, shared hooks, central utilities — anything with many callers
+- **Concurrency, async behavior, state management** across component boundaries
+- **Money, billing or other critical business logic**
+- the **cause of an error is not understood** (symptom known, cause not)
+- a **new pattern** emerges: first migration of a kind, new kind of test, new interface to the outside
 
-**Letzte Zeile des Plans** ist die Modellzeile nach §3 — sie steht damit schon im Freigabedialog.
+**No planning phase** for: single-file change with a clear goal, text correction, rename, formatting, carrying out an approved plan, a pure research question.
 
-**Plandatei:** Empfiehlt §3 einen Wechsel („**Weiter:**") oder steht ein Komprimier-Hinweis an (§3a), wird der Plan zusätzlich als Datei geschrieben — `docs/plans/<YYYY-MM-DD>-<slug>.md`, ersatzweise ins Scratchpad — und der Pfad genannt. Der Kontext überlebt Kompaktierung und Session-Ende nicht, der Plan muss das.
+**Escape:** If the user says "just do it", "implement directly" or the like, the phase is dropped — even when a trigger is met. Exception: migration, auth and security stay subject to planning; the plan is cut to the bare minimum there.
+
+This list **beats self-assessment**: A model that hasn't understood a cause typically considers the case clear.
 
 ---
 
-## 3. Modellempfehlung
+## 2. Planning phase
 
-**Wann:** vor **jeder Umsetzung** — vor der ersten Änderung an Code, Konfiguration oder Doku, unabhängig davon, ob eine Planungsphase lief (§1). Ausgenommen ist nur, was §1 als „keine Planungsphase" nennt, außer „Abarbeiten eines beschlossenen Plans": Dort steht die Zeile gerade. Auch „mach einfach" hebt sie nicht auf; sie kostet eine Zeile, keine Runde.
+The tool is the built-in **plan mode** (write the plan, output it, wait for approval) — no separate mechanism beside it. Read first, then plan: affected code, architecture, conventions, dependencies. All essential architecture and design decisions are made **here**, not during implementation.
 
-**Bleibt das Modell** — genau eine Zeile, dann direkt weiterarbeiten:
+The plan contains: affected files and components · planned changes · interfaces · data flows · dependencies · invariants and constraints · edge cases · risks and side effects · required tests · verification steps · possible regressions. The yardstick: **another model must be able to implement it without redesigning the architecture.**
+
+The **last line of the plan** is the model line from §3 — so it already stands in the approval dialog.
+
+**Plan file:** If §3 recommends a switch ("**Next:**") or a compaction hint is due (§3a), the plan is additionally written as a file — `docs/plans/<YYYY-MM-DD>-<slug>.md`, otherwise to the scratchpad — and its path is named. The context survives neither compaction nor the end of the session; the plan has to.
+
+---
+
+## 3. Model recommendation
+
+**When:** before **every implementation** — before the first change to code, configuration or docs, regardless of whether a planning phase ran (§1). Excepted is only what §1 lists as "no planning phase", except "carrying out an approved plan": there the line stands right then. Even "just do it" does not lift it; it costs a line, not a round.
+
+**The model stays** — exactly one line, then keep working:
 
 ```
-**Modell:** Opus xhigh passt, weil <Kriterium aus der Liste unten>.
+**Model:** Opus xhigh fits, because <criterion from the list below>.
 ```
 
-**Lohnt ein Wechsel** — die Antwort endet mit dem Hinweis, umgesetzt wird **nicht**; der User wechselt und schickt den Auftrag (oder drückt den Knopf „Modell + Effort" der Mod `may-kit-panel`, der `/compact`, `/model` und `/effort` ausführt und den Auftrag schickt; „↺" stellt danach Modell und Effort von vor dem ersten Wechsel wieder her):
+**A switch is worthwhile** — the answer ends with the hint, nothing is implemented; the user switches and sends the order (or presses the "Model + Effort" button of the `may-kit-panel` mod, which runs `/compact`, `/model` and `/effort` and sends the order; "↺" then restores the model and effort from before the first switch):
 
 ````
-**Weiter:** [erst `/compact`, dann] `/model` → [Opus | Sonnet], Effort [medium | high | xhigh]. [Begründung, ein Satz.]
-Plan: <Pfad> [· danach Opus-Review]
+**Next:** [first `/compact`, then] `/model` → [Opus | Sonnet], Effort [medium | high | xhigh]. [Reason, one sentence.]
+Plan: <path> [· then Opus review]
 
 ```
-/compact …   ← nur wenn zugleich ein Schnittpunkt nach §3a erreicht ist
+/compact …   ← only if a cut point per §3a is reached at the same time
 ```
 ````
 
-Pflichtinhalt: Modell, Effort, Begründung; Plandatei, sobald eine geschrieben wurde (§2); „danach Opus-Review", wenn §5 schon absehbar „Ja" ergibt. Die Schreibweise `/model` → <Modell>, Effort <Stufe> ist fest: Die Mod liest genau sie.
+Required content: model, effort, reason; plan file as soon as one has been written (§2); "then Opus review" if §5 already points to "Yes". The spelling `/model` → <model>, Effort <level> is fixed: the mod reads exactly it.
 
-**Plan-Mode:** Der Plan endet mit der Modellzeile (§2). Steht dort „**Weiter:**", startet die Freigabe **nicht** die Umsetzung: Plandatei schreiben, den Hinweis ausgeben, Antwort beenden.
+**Plan mode:** The plan ends with the model line (§2). If it says "**Next:**", approval does **not** start the implementation: write the plan file, output the hint, end the answer.
 
-**Nicht weglassen:** Die Zeile fehlt nie stillschweigend. Ein fehlender Hinweis sieht aus wie ein vergessener; deshalb steht auch „passt" ausdrücklich da. Als richtig gilt das laufende Modell nur mit einem benannten Kriterium — „ich bin ja schon da" ist keins.
+**Don't omit it:** The line is never silently missing. A missing hint looks like a forgotten one; that is why "fits" is also stated explicitly. The current model counts as right only with a named criterion — "I'm already here" is none.
 
-**Mechanik:** Den Modellwechsel löst der User aus (`/model`, oder der Knopf „Modell + Effort"). Effort setzt `/effort <stufe>` (persistiert als `effortLevel`): `low | medium | high | xhigh | max | auto`; empfohlen werden nur `medium | high | xhigh`. Subagents ohne eigene `model:`-Angabe laufen auf Sonnet (`CLAUDE_CODE_SUBAGENT_MODEL` in `~/.claude/settings.json`, seit 2026-11-02) — wer einen Subagent für schwere Analyse braucht, gibt das Modell ausdrücklich mit.
+**Mechanics:** The user triggers the model switch (`/model`, or the "Model + Effort" button). Effort is set with `/effort <level>` (persisted as `effortLevel`): `low | medium | high | xhigh | max | auto`; only `medium | high | xhigh` are recommended. Subagents without a `model:` of their own run on Sonnet (`CLAUDE_CODE_SUBAGENT_MODEL` in `~/.claude/settings.json`, if set) — whoever needs a subagent for heavy analysis passes the model explicitly.
 
-**Kriterien:**
-- **Sonnet medium** — mechanische, vollständig definierte Arbeit: repetitive Änderungen, Boilerplate, Umbenennungen, einfache Tests, Migration auf ein festgelegtes Interface, kleine Refactorings ohne Architekturentscheidung.
-- **Sonnet high** — **bevorzugter Executor** für gut geplante Implementierung: Architektur steht, Plan detailliert, Komponenten bekannt, Zielverhalten und Verifikation eindeutig, keine grundlegenden Entscheidungen mehr zu erwarten.
-- **Opus xhigh** — sobald eines zutrifft: offene Architekturentscheidung · unklare Anforderung oder unklares Systemverhalten · Ursache nicht verstanden · tiefe Analyse erst während der Umsetzung möglich · komplexe Wechselwirkungen zwischen Systemen · Concurrency und Race Conditions · riskante Migration · Security · komplexes State-Management · verteilte oder Agentensysteme · ein Fehler würde systemisch und schwer erkennbar wirken.
+**Criteria:**
+- **Sonnet medium** — mechanical, fully defined work: repetitive changes, boilerplate, renames, simple tests, migration to a fixed interface, small refactorings without an architecture decision.
+- **Sonnet high** — **preferred executor** for well-planned implementation: architecture is settled, plan detailed, components known, target behavior and verification unambiguous, no fundamental decisions left to expect.
+- **Opus xhigh** — as soon as one applies: open architecture decision · unclear requirement or unclear system behavior · cause not understood · deep analysis only possible during implementation · complex interactions between systems · concurrency and race conditions · risky migration · security · complex state management · distributed or agent systems · an error would be systemic and hard to notice.
 
-**Kopplung an das Projektmodell:** Hat das Projekt ein eigenes Autonomie- oder Risikomodell (Stufen 1–3, Risikoklassen S/M/L o. ä.), ist **dessen Vokabular maßgeblich**:
+**Coupling to the project model:** If the project has its own autonomy or risk model (levels 1–3, risk classes S/M/L or similar), **its vocabulary prevails**:
 
-| Projekt-Einstufung | Konsequenz |
+| Project rating | Consequence |
 |---|---|
-| höchste Stufe (Stop-and-Wait / Klasse L) | Opus xhigh, **kein** Delegieren an Sonnet |
-| mittlere Stufe (autonomer Lauf mit Endprüfung / Klasse M) | Plan + Sonnet high |
-| niedrigste Stufe (vollautonom / Klasse S) | keine Planungsphase, Modellzeile, direkt arbeiten |
+| highest level (stop-and-wait / class L) | Opus xhigh, **no** delegating to Sonnet |
+| middle level (autonomous run with final check / class M) | plan + Sonnet high |
+| lowest level (fully autonomous / class S) | no planning phase, model line, work directly |
 
-Ohne solches Modell gilt allein die Trigger-Liste aus §1.
-
----
-
-## 3a. Komprimieren an Abschnittsgrenzen
-
-Komprimiert wird an einer **Abschnittsgrenze**, nicht ab einer Token-Zahl. Ziel: Der nächste Abschnitt startet mit allem, was er braucht — und ohne den Ballast des vorigen.
-
-**Schnittpunkte** — dann den Hinweis geben:
-- Plan freigegeben, Umsetzung beginnt. Die Erkundung hat ihren Zweck erfüllt; die Umsetzung braucht nur noch den Plan.
-- Etappe oder Aufgabe fertig: verifiziert, committet, Stand dokumentiert.
-- Fehlersuche abgeschlossen: Ursache und Fix stehen fest, die Spuren der Suche braucht niemand mehr.
-- Themenwechsel: Der neue Auftrag hat mit dem bisherigen nichts zu tun → `/clear` statt `/compact`.
-
-**Kein Schnittpunkt**, solange: eigene Änderungen ungesichert sind · eine Rückfrage oder Freigabe offen ist · ein Lauf im Hintergrund arbeitet · ein Review aussteht, das sich auf eben gelesenen Code bezieht · der nächste Schritt direkt auf gerade Gelesenem aufbaut und das Neu-Lesen mehr kostet, als es spart.
-
-**Vorher sichern** — was weiter gebraucht wird, gehört in Dateien, nicht in die Zusammenfassung: Plan → Plandatei (§2) · Stand → Spec bzw. Doku · Entscheidungen → Entscheidungslog oder Spec · Umgebungsfallen → Fehlerkatalog bzw. Projekt-Memory.
-
-**Was mitgeht:** Ziel des nächsten Abschnitts · Pfade zu Plan und Spec (mit §) · Entscheidungen und Weisungen aus dem Gespräch, die noch nirgends stehen · gefundene Fallen · offene Punkte.
-**Was nicht mitgeht:** Dateiinhalte, Tool-Ausgaben, Logs · verworfene Entwürfe · Erkundungswege (nur deren Ergebnis: „X geprüft, scheidet aus, weil …").
-
-**Form** — am Ende der Antwort, nach dem Ergebnis:
-
-````
-**Jetzt komprimieren:** <Abschnitt> fertig, Stand in <Datei>.
-
-```
-/compact <Ziel des nächsten Abschnitts>; Grundlage <Pfad §>; offen: …; Fallen: …
-```
-````
-
-Der Befehl steht immer in einem eigenen Codeblock, damit er kopierfertig ist, und bleibt kurz (höchstens rund zehn Zeilen); was länger wäre, gehört in eine Datei. Fallen Komprimieren und Modellwechsel (§3) zusammen, wird daraus **ein** „Weiter:"-Hinweis nach §3: **erst `/compact`, dann `/model`** — so schreibt noch das stärkere Modell die Zusammenfassung.
+Without such a model, only the trigger list from §1 applies.
 
 ---
 
-## 4. Umsetzung durch ein anderes Modell
+## 3a. Compacting at section boundaries
 
-Der Plan ist **bindend**. Kleine technische Anpassungen sind erlaubt, solange die Architektur unberührt bleibt; Architektur nicht eigenmächtig neu entwerfen.
+Compaction happens at a **section boundary**, not at a token count. Goal: the next section starts with everything it needs — and without the ballast of the previous one.
 
-Stoppen und eskalieren, sobald: eine zentrale Annahme des Plans falsch ist · ein wichtiger Edge Case übersehen wurde · die Architektur grundlegend anders sein müsste · größere ungeplante Abhängigkeiten auftauchen · eine erhebliche Designentscheidung ansteht · die Lösung nicht sicher oder robust umsetzbar ist. Den Arbeitsstand vorher in einen benennbaren Zustand bringen (committet oder präzise beschrieben):
+**Cut points** — then give the hint:
+- Plan approved, implementation begins. The exploration has served its purpose; the implementation needs only the plan.
+- Stage or task done: verified, committed, state documented.
+- Bug hunt finished: cause and fix are settled, nobody needs the traces of the search any more.
+- Change of topic: the new task has nothing to do with the previous one → `/clear` instead of `/compact`.
+
+**Not a cut point** as long as: own changes are unsaved · a question or approval is open · a background run is working · a review is pending that refers to code just read · the next step builds directly on what was just read and re-reading costs more than it saves.
+
+**Secure first** — what is still needed belongs in files, not in the summary: plan → plan file (§2) · state → spec or docs · decisions → decision log or spec · environment pitfalls → error catalog or project memory.
+
+**What goes along:** goal of the next section · paths to plan and spec (with §) · decisions and instructions from the conversation that stand nowhere yet · pitfalls found · open points.
+**What doesn't go along:** file contents, tool output, logs · discarded drafts · exploration paths (only their result: "X checked, ruled out, because …").
+
+**Form** — at the end of the answer, after the result:
+
+````
+**Compact now:** <section> done, state in <file>.
 
 ```
-OPUS-ESKALATION EMPFOHLEN
+/compact <goal of the next section>; basis <path §>; open: …; pitfalls: …
+```
+````
+
+The command always stands in a code block of its own, so it can be copied, and stays short (at most about ten lines); anything longer belongs in a file. If compaction and a model switch (§3) coincide, they become **one** "Next:" hint per §3: **first `/compact`, then `/model`** — so the stronger model still writes the summary.
+
+---
+
+## 4. Implementation by another model
+
+The plan is **binding**. Small technical adjustments are allowed as long as the architecture is untouched; don't redesign the architecture on your own.
+
+Stop and escalate as soon as: a central assumption of the plan is wrong · an important edge case was missed · the architecture would have to be fundamentally different · larger unplanned dependencies turn up · a significant design decision is due · the solution cannot be implemented safely or robustly. Bring the work into a nameable state first (committed or precisely described):
+
+```
+OPUS ESCALATION RECOMMENDED
 - Problem:
-- Warum der Plan nicht ausreicht:
-- Welche Entscheidung neu zu treffen ist:
-- Stand der Implementierung: [was fertig ist, welche Dateien angefasst sind, ob committet und lauffähig]
+- Why the plan is not enough:
+- Which decision has to be made anew:
+- State of the implementation: [what is done, which files were touched, whether committed and runnable]
 ```
 
 ---
 
-## 5. Review nach der Umsetzung
+## 5. Review after implementation
 
-Erst nach bestandenen Tests und Verifikation. **Arbeitsmodus `schnell`** (Projektdatei `.claude/arbeitsmodus`): Dort entfallen die Prüfpflichten dieses Abschnitts und aus Specs, außer Datenbanktests bei Migrationen; Ergebnisse heißen dann „nicht geprüft". **Belege vor Behauptungen:** Prüfkommandos tatsächlich ausführen und die Ausgabe lesen, bevor „fertig", „behoben" oder „grün" fällt.
+Only after tests and verification have passed. **Working mode `fast`** (project file `.claude/working-mode`; older projects keep `.claude/arbeitsmodus` with the word `schnell`): there the duties of this section and those from specs lapse, except database tests for migrations; results then read "not checked". **Evidence before claims:** actually run the check commands and read the output before "done", "fixed" or "green" is said.
 
-**Zeitpunkt:** Empfohlen wird erst, wenn keine offene Frage und kein fehlender Teil den Code der Etappe mehr ändern kann. Was offen bleiben darf, ohne das Review zu verschieben: Gerätetest, Browser-Test, Laufzeitmessung, Punkte einer späteren Etappe. Steht eine Rückfrage aus, deren Antwort den Code ändern kann, kommt zuerst die Frage, die Review-Empfehlung erst nach der Umsetzung der Antwort.
+**Timing:** A recommendation comes only when no open question and no missing part can change the stage's code any more. What may stay open without postponing the review: device test, browser test, runtime measurement, points of a later stage. If a question is pending whose answer can change the code, the question comes first, the review recommendation only after the answer has been implemented.
 
-**Bündeln:** Kleine Teilschritte derselben Etappe (4b, 4c …) werden gemeinsam geprüft, nicht jeder einzeln. Die Empfehlung kommt nach dem letzten Teilschritt und nennt den Umfang (Commit-Bereich oder Teilschritte). Ausnahme: Ein Teilschritt mit Auth-, RLS- oder Security-Logik, auf dem der nächste aufbaut, wird sofort geprüft.
+**Bundling:** Small sub-steps of the same stage (4b, 4c …) are checked together, not one by one. The recommendation comes after the last sub-step and names the scope (commit range or sub-steps). Exception: a sub-step with auth, RLS or security logic on which the next one builds is checked at once.
 
-Ausgabe **nur im Fall „Ja"**:
+Output **only in the "Yes" case**:
 
 ```
-REVIEW-EMPFEHLUNG
-- Opus-Review empfohlen: Ja
-- Modell / Effort: [Opus | Sonnet] / [medium | high | xhigh]
-- Begründung:
-- Besonders zu prüfen:
+REVIEW RECOMMENDATION
+- Opus review recommended: Yes
+- Model / Effort: [Opus | Sonnet] / [medium | high | xhigh]
+- Reasoning:
+- Check in particular:
 - Commits: <sha> [<sha> …]
 ```
 
-`Commits:` nennt nur die eigenen Commits der Etappe als Kurz-SHAs. Ein Bereich `a..b` reicht nicht, weil andere Sessions dazwischen auf denselben Branch committen.
+`Commits:` names only the stage's own commits as short SHAs. A range `a..b` is not enough, because other sessions commit to the same branch in between.
 
-**Ablauf, wenn der User „Review starten" sagt** (oder den Review-Button der Mod `may-kit-panel` drückt):
-1. **Prüfen lässt die Session einen frischen Subagent** (Agent-Tool, `model` und `effort` wie im Block). Er bekommt die SHAs aus dem `Commits:`-Block der letzten REVIEW-EMPFEHLUNG (fehlt der Block, etwa nach `/compact`, nennt die Session ihre Kandidaten und fragt nach, statt per `git log` zu raten: Commits paralleler Sessions tragen denselben Autor), die Liste „Besonders zu prüfen" und den Auftrag, genau `git show <sha>` je Commit zu prüfen, nichts sonst. Er liest den umliegenden Code, ändert nichts und liefert Befunde mit Datei:Zeile nach dem Maßstab unten.
-2. **Beheben tut die Session selbst:** jeden Befund, der ihre eigenen Dateien betrifft, mit Ursache belegt (§6). Befunde in Dateien anderer Sessions oder ohne echten Fehler werden genannt, nicht angefasst.
-3. Danach Tests (im Modus `schnell` keine, siehe oben), Commit (`git commit --only`), Meldung: je Befund behoben, verworfen (mit Grund) oder fremd.
+**Procedure when the user says "Start review"** (or presses the review button of the `may-kit-panel` mod):
+1. **The session has a fresh subagent do the checking** (Agent tool, `model` and `effort` as in the block). It gets the SHAs from the `Commits:` block of the last REVIEW RECOMMENDATION (if the block is missing, for instance after `/compact`, the session names its candidates and asks, instead of guessing with `git log`: commits of parallel sessions carry the same author), the "Check in particular" list and the task to check exactly `git show <sha>` per commit, nothing else. It reads the surrounding code, changes nothing and returns findings with file:line by the yardstick below.
+2. **The session fixes them itself:** every finding that concerns its own files, with the cause evidenced (§6). Findings in other sessions' files or without a real defect are named, not touched.
+3. Then tests (none in mode `fast`, see above), commit (`git commit --only`), report: per finding fixed, discarded (with reason) or foreign.
 
-**Kein `/code-review`, solange parallele Sessions im selben Arbeitsbaum laufen, auch nicht mit Ziel.** Das Skill kennt als Ziel nur PR, Branch oder Pfad. Ohne Ziel nimmt es den Diff gegen den Upstream samt aller ungesicherten Dateien im Arbeitsbaum, also auch die der anderen Sessions; ein Branch-Ziel bringt deren Commits mit, ein Pfad-Ziel ihre Änderungen in derselben Datei. Commit-SHAs als Argument ignoriert es (festgestellt 2026-11-03: 81 fremde Dateien statt zwei eigener Commits). Ohne parallele Sessions bleibt `/code-review` erlaubt.
+**No `/code-review` while parallel sessions run in the same working tree, not even with a target.** The skill knows only PR, branch or path as a target. Without a target it takes the diff against upstream including all unsaved files in the working tree, i.e. those of the other sessions too; a branch target brings their commits along, a path target their changes in the same file. It ignores commit SHAs as an argument (found 2026-11-03: 81 foreign files instead of two own commits). Without parallel sessions `/code-review` stays allowed.
 
-**Ja bei:** systemweiten oder architektonischen Änderungen · größeren Refactorings · neuen Kernkomponenten · komplexen Datenflüssen · Agenten-, Memory- oder Orchestrierungssystemen · Concurrency und Async-Logik · Datenbankmigrationen · Security-Komponenten · kritischer Geschäftslogik (Trading, Finanzen, Abrechnung) · komplexem State-Management · vielen indirekten Abhängigkeiten · seltenen Fehlern mit großer Wirkung · **jeder Abweichung vom ursprünglichen Plan**. **Nein** bei einfachen, eindeutig überprüfbaren Implementierungen — kein Review-Theater.
+**Yes for:** system-wide or architectural changes · larger refactorings · new core components · complex data flows · agent, memory or orchestration systems · concurrency and async logic · database migrations · security components · critical business logic (trading, finance, billing) · complex state management · many indirect dependencies · rare errors with large impact · **any deviation from the original plan**. **No** for simple, clearly verifiable implementations — no review theater.
 
-**Aufgabe des Opus-Reviews:** **Fehler suchen**, nicht bestätigen. Geprüft wird: Anforderungen vollständig · Umsetzung entspricht dem Konzept · unnötige Komplexität · verletzte Architekturprinzipien · versteckte Seiteneffekte · fehlende Edge Cases · Fehlerbehandlung · Race Conditions und State-Probleme · neue technische Schulden · decken die Tests die relevanten Fehlerfälle · Regressionen · unbeabsichtigt veränderte Funktionen · deutlich einfachere oder robustere Lösung. Befunde nach **Kritisch / Hoch / Mittel / Niedrig**, getrennt in tatsächliches Problem · Risiko · optionaler Verbesserungsvorschlag.
-
----
-
-## 6. Verhältnis zu Skills, Debugging
-
-- **Das Superpowers-Plugin ist bewusst deaktiviert** (2026-09-03, in beiden Scopes `false`). Sein Prozessgerüst trägt diese Datei (§2–§5). Nicht ungefragt reaktivieren, kein gleichwertiges Skill-Gerüst ersatzweise aufbauen.
-- **Debugging:** Bei Bug, Testausfall oder unerwartetem Verhalten zuerst die Ursache belegen — reproduzieren, Hypothese formulieren, am Code oder an Logs prüfen — erst dann einen Fix vorschlagen. Kein Reparieren auf Verdacht.
+**Task of the Opus review:** **look for errors**, don't confirm. Checked: requirements complete · implementation matches the concept · unnecessary complexity · violated architecture principles · hidden side effects · missing edge cases · error handling · race conditions and state problems · new technical debt · do the tests cover the relevant failure cases · regressions · unintentionally changed functions · a much simpler or more robust solution. Findings graded **Critical / High / Medium / Low**, separated into actual problem · risk · optional improvement suggestion. The result of a review is reported as a table `| Finding | Result |` with "fixed", "discarded: <reason>" or "foreign: <session>".
 
 ---
 
-## 7. Browser: gemeinsames Chrome (nur dieser Rechner)
+## 6. Relation to skills, debugging
 
-Der MCP-Server `chrome-devtools` (User-Scope, `~/.claude.json`) hängt an **einem** Chrome, das sich alle Sessions und Projekte teilen (`~/.claude/tools/chrome-geteilt.mjs`, Port 9333 (9222 belegt das normale Chrome), Profil `~/.cache/chrome-devtools-mcp/chrome-profile`, dort angemeldet; eingerichtet 2026-10-23).
-
-- Immer mit `new_page` einen **eigenen Tab** öffnen und nur darin arbeiten. Fremde Tabs (andere Sessions, Marius) nie auswählen, bedienen oder schließen — `list_pages` zeigt sie alle.
-- Den eigenen Tab am Ende mit `close_page` schließen.
-- Nicht ab- oder ummelden; die Anmeldung gehört allen Sessions.
-- Antwortet Chrome nicht, läuft meist noch ein Chrome mit demselben Profil ohne Debug-Port (altes Plugin) — Marius bitten, es zu schließen, nicht selbst beenden.
+- **The Superpowers plugin is deliberately disabled** (2026-09-03, `false` in both scopes). Its process scaffolding is carried by this file (§2–§5). Don't re-enable it unasked, don't build an equivalent skill scaffolding as a substitute.
+- **Debugging:** For a bug, a failing test or unexpected behavior, first evidence the cause — reproduce, formulate a hypothesis, check against code or logs — only then propose a fix. No repairing on suspicion.
 
 ---
 
-*Angelegt 2026-09-03, gestrafft 2026-11-02, §3a Komprimieren 2026-11-03, §3 Modellzeile vor jeder Umsetzung 2026-11-03.*
+## 7. Browser: shared Chrome (example from the author's machine — drop or replace)
+
+The MCP server `chrome-devtools` (user scope, `~/.claude.json`) hangs on **one** Chrome that all sessions and projects share (`~/.claude/tools/chrome-geteilt.mjs`, port 9333 (9222 is taken by the normal Chrome), profile `~/.cache/chrome-devtools-mcp/chrome-profile`, logged in there; set up 2026-10-23). This section is specific to that setup; delete it or describe your own.
+
+- Always open a **tab of your own** with `new_page` and work only in it. Never select, operate or close foreign tabs (other sessions, the user) — `list_pages` shows them all.
+- Close your own tab at the end with `close_page`.
+- Don't log out or switch accounts; the login belongs to all sessions.
+- If Chrome doesn't answer, usually another Chrome with the same profile but without a debug port is still running (old plugin) — ask the user to close it, don't kill it yourself.
+
+---
+
+*Created 2026-09-03, tightened 2026-11-02, §3a compaction 2026-11-03, §3 model line before every implementation 2026-11-03, English with language-neutral markers 2026-11-03.*

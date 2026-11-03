@@ -1,51 +1,54 @@
-# may-kit einrichten — Prompt für Claude
+# Set up may-kit — prompt for Claude
 
-Gib Claude in einem neuen oder bestehenden Workspace diesen Satz:
+In a new or existing workspace, give Claude this sentence:
 
-> Richte may-kit ein, nach https://github.com/mariusmaydev/may-kit/blob/main/INSTALL.md
+> Set up may-kit following https://github.com/mariusmaydev/may-kit/blob/main/INSTALL.md
 
-oder kopiere den Teil unter der Linie direkt in den Chat.
+or copy the part below the line straight into the chat.
 
 ---
 
-Du richtest **may-kit** ein, die Claude-Code-Konfiguration von Marius May: globale Arbeitsregeln (`CLAUDE.md`), den Output-Style `Marius` und die Mod `may-kit-panel` (Knöpfe über dem Prompt: Modell + Effort, ↺, Review, Komprimieren, Live, ⚡, ?). Arbeite die Schritte der Reihe nach ab, melde am Ende in einer Tabelle `Schritt | Ergebnis`, und frag nur, wo unten „fragen“ steht.
+You are setting up **may-kit**, an opinionated Claude Code configuration: global working rules (`CLAUDE.md`), the output style `Marius` and the mod `may-kit-panel` (buttons above the prompt: Model + Effort, ↺, Review, Compact, Live, ⚡, ?). Work through the steps in order, report a table `Step | Result` at the end, and ask only where it says "ask" below.
 
-## 1. Rechner (einmal je Rechner)
+## 1. Machine (once per machine)
 
-1. **Repo holen.** Liegt `may-kit` schon neben den anderen Repos (Windows: `%USERPROFILE%\Documents\GitHub\may-kit`), dort `git pull`. Sonst dorthin klonen: `gh repo clone mariusmaydev/may-kit`. Ein alter Ordner `claude-user-config` ist derselbe Stand unter altem Namen: umbenennen in `may-kit`, nicht doppelt klonen.
-2. **Installieren.** Windows: `powershell -ExecutionPolicy Bypass -File install.ps1` im Repo. Das Skript verlinkt `CLAUDE.md` und `output-styles/` nach `~/.claude/`, sichert vorhandene Dateien als `.bak-<Datum>` und setzt in `~/.claude/settings.json` genau zwei Schlüssel: `outputStyle` und `env.CLAUDE_CODE_PLUGIN_DIRS` (alle Ordner unter `mods/`). Es braucht Node. Ohne Windows: dieselben zwei Links mit `ln -s` anlegen und die zwei Schlüssel von Hand setzen; vorher fragen.
-3. **Prüfen**, jede Zeile mit Beleg:
-   - `~/.claude/CLAUDE.md` und `~/.claude/output-styles` zeigen ins Repo.
-   - `~/.claude/settings.json`: `"outputStyle": "Marius"`, und `CLAUDE_CODE_PLUGIN_DIRS` nennt `…/may-kit/mods/may-kit-panel`.
-   - `claude plugin validate <repo>/mods/may-kit-panel` und `claude plugin test <repo>/mods/may-kit-panel` grün.
-4. **Hinweis an den User:** Die Mod und der Style greifen erst in einem **neuen** Chat.
+1. **Get the repo.** If `may-kit` already sits beside the other repos (Windows: `%USERPROFILE%\Documents\GitHub\may-kit`), run `git pull` there. Otherwise clone it there: `gh repo clone mariusmaydev/may-kit`. An old folder `claude-user-config` is the same state under an old name: rename it to `may-kit`, don't clone twice.
+2. **Install.** Windows: `powershell -ExecutionPolicy Bypass -File install.ps1` in the repo. The script links `CLAUDE.md` and `output-styles/` into `~/.claude/`, backs up existing files as `.bak-<date>` and sets three keys in `~/.claude/settings.json`: `outputStyle`, `env.CLAUDE_CODE_PLUGIN_DIRS` (all folders under `mods/`) and `language`, taken from the Windows display language, only if it isn't set yet. It needs Node. Without Windows: create the same two links with `ln -s`, then run `node set-user-settings.cjs ~/.claude/settings.json "$(date +%Y%m%d%H%M%S)" Marius <repo>/mods/may-kit-panel`, which also reads `LC_ALL` / `LC_MESSAGES` / `LANG` for `language`; ask first.
+3. **Check**, every line with evidence:
+   - `~/.claude/CLAUDE.md` and `~/.claude/output-styles` point into the repo.
+   - `~/.claude/settings.json`: `"outputStyle": "Marius"`, and `CLAUDE_CODE_PLUGIN_DIRS` names `…/may-kit/mods/may-kit-panel`.
+   - `~/.claude/settings.json`: `"language"` holds the system language (e.g. `german`, `czech`), or is absent on an English system. Never overwrite a value the user set; to switch languages, only the user edits it.
+   - `claude plugin validate <repo>/mods/may-kit-panel` and `claude plugin test <repo>/mods/may-kit-panel` are green.
+4. **Note to the user:** The mod and the style take effect only in a **new** chat. Claude's answers and the panel follow the `language` setting: English by default, German buttons and orders for `german`.
 
-## 2. Projekt (je Workspace)
+## 2. Project (per workspace)
 
-Lies zuerst die Projekt-`CLAUDE.md`, falls es eine gibt. Sie hat Vorrang vor allem hier; nichts darin überschreiben, nur ergänzen.
+First read the project's `CLAUDE.md`, if there is one. It takes precedence over everything here; overwrite nothing in it, only add.
 
-Die Knöpfe richten sich nach dem Projekt:
+The buttons depend on the project:
 
-| Knopf | erscheint, wenn | was er auslöst |
+| Button | Appears when | What it triggers |
 |---|---|---|
-| Modell + Effort | immer; hervorgehoben nach einem `**Weiter:**`-Hinweis | führt `/compact` (falls genannt), `/model` und `/effort` aus und schickt den Auftrag zur Umsetzung (§3) |
-| ↺ | nach einem Wechsel | stellt Modell und Effort von vor dem ersten Wechsel wieder her |
-| Review | immer | schickt „Review starten“ mit den Commits der letzten REVIEW-EMPFEHLUNG (globale `CLAUDE.md` §5) |
-| Komprimieren | immer | komprimiert mit der Anweisung des letzten `/compact`-Hinweises (§3a) |
-| Live | `scripts/merge.ps1` existiert | schickt „Release nach production“; die Projekt-`CLAUDE.md` muss beschreiben, was das heißt |
-| ⚡ | `.claude/arbeitsmodus` existiert | schickt „Modus schnell“ / „Modus sorgfältig“; grau = sorgfältig, gelb = schnell |
-| ? | immer | klappt die Erklärungen auf |
+| Model + Effort | always; highlighted after a `**Next:**` hint | runs `/compact` (if named), `/model` and `/effort` and sends the order to implement (§3) |
+| ↺ | after a switch | restores the model and effort from before the first switch |
+| Review | always | sends "Start review" with the commits of the last REVIEW RECOMMENDATION (global `CLAUDE.md` §5) |
+| Compact | always | compacts with the instruction of the last `/compact` hint (§3a) |
+| Live | `scripts/merge.ps1` exists | sends "Release to production"; the project's `CLAUDE.md` has to describe what that means |
+| ⚡ | `.claude/working-mode` exists | sends "Mode fast" / "Mode careful"; grey = careful, yellow = fast |
+| ? | always | opens the explanations |
 
-Richte ein, was fehlt, **nach Rückfrage** (eine Frage mit allen Punkten, je Punkt dein Vorschlag):
+(With `language: german` the panel shows German labels and sends the German orders "Review starten", "Release nach production", "Modus schnell" / "Modus sorgfältig". A project that still has `.claude/arbeitsmodus` with `schnell` / `sorgfaeltig` keeps working.)
 
-1. **Arbeitsmodus.** Datei `.claude/arbeitsmodus` mit dem Wort `sorgfaeltig` anlegen und in der Projekt-`CLAUDE.md` einen Abschnitt „Arbeitsmodus — schnell oder sorgfältig“ ergänzen: was `schnell` erlaubt (fertige Änderung ohne Prüfung committen und bis Production ausliefern; auch Prüfpflichten aus Specs und aus dem Review-Ablauf entfallen, außer Datenbanktests bei Migrationen) und was in beiden Modi gilt (kein Datenverlust, Produktion nie implizit, Schema vor Code, nur eigene Dateien committen). Umschalten: „Modus schnell“ / „Modus sorgfältig“ → Claude schreibt das Wort und committet nur diese Datei.
-2. **Release.** Nur wenn das Projekt einen Weg nach Production hat: ein Skript `scripts/merge.ps1` (oder das bestehende Release-Kommando dort verdrahten) und in der Projekt-`CLAUDE.md` ein Abschnitt, was „Release nach production“ Schritt für Schritt auslöst. Ohne Release-Weg nichts anlegen; der Live-Knopf bleibt dann weg.
-3. **Review-Regel.** Steht in der Projekt-`CLAUDE.md` nichts zum Review, eine Zeile ergänzen: Reviews laufen auf Zuruf nach globaler `CLAUDE.md` §5 (Subagent prüft genau die Commits der Empfehlung, die Session behebt). Laufen im Workspace parallele Sessions, dazu: kein `/code-review`.
+Set up what is missing, **after asking** (one question with all points, your proposal for each):
 
-Danach nur die eigenen Dateien committen (`git commit --only <pfade>`), nie fremde Änderungen im Arbeitsbaum.
+1. **Working mode.** Create the file `.claude/working-mode` with the word `careful` and add a section "Working mode — fast or careful" to the project's `CLAUDE.md`: what `fast` allows (commit a finished change without checking and ship it to production; the duties from specs and from the review procedure lapse too, except database tests for migrations) and what holds in both modes (no data loss, production never implicit, schema before code, commit only your own files). Switching: "Mode fast" / "Mode careful" → Claude writes the word and commits only this file.
+2. **Release.** Only if the project has a way to production: a script `scripts/merge.ps1` (or wire the existing release command there) and, in the project's `CLAUDE.md`, a section on what "Release to production" triggers, step by step. Without a release path create nothing; the Live button then stays away.
+3. **Review rule.** If the project's `CLAUDE.md` says nothing about reviews, add one line: reviews run on request, per global `CLAUDE.md` §5 (a subagent checks exactly the commits of the recommendation, the session fixes). If parallel sessions run in the workspace, add: no `/code-review`.
 
-## 3. Grenzen
+Afterwards commit only your own files (`git commit --only <paths>`), never other changes in the working tree.
 
-- Keine Klartext-Credentials in Dateien oder `settings.json`.
-- `~/.claude/settings.json` nur über `install.ps1` bzw. `set-user-settings.cjs` ändern, keine weiteren Schlüssel.
-- Nichts aus dem Repo `may-kit` selbst ändern, außer der User sagt es; Anpassungen gehören ins Projekt.
+## 3. Limits
+
+- No plaintext credentials in files or `settings.json`.
+- Change `~/.claude/settings.json` only through `install.ps1` or `set-user-settings.cjs`, no further keys.
+- Change nothing in the `may-kit` repo itself unless the user says so; adjustments belong in the project.
