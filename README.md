@@ -12,7 +12,10 @@ the config applies in every workspace automatically — no per-repo setup.
 |---|---|---|
 | `CLAUDE.md` | `~/.claude/CLAUDE.md` | Global working rules (planning, model choice, review) |
 | `output-styles/` | `~/.claude/output-styles/` | Custom output styles; `Marius` is the active one |
-| — | `"outputStyle": "Marius"` in `~/.claude/settings.json` | Set by `install.ps1` via `set-output-style.cjs` (needs Node); only that key changes |
+| `mods/<name>/` | `env.CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json` | Claude Code mods, loaded by every new session; `realesos-cockpit` = Review → Komprimieren buttons above the prompt |
+| — | `"outputStyle": "Marius"` in `~/.claude/settings.json` | Set by `install.ps1` via `set-user-settings.cjs` (needs Node); only these two keys change |
+
+Check a mod after editing: `claude plugin validate mods/<name>` and `claude plugin test mods/<name>`.
 
 The style `Marius` defines **how** Claude answers; `CLAUDE.md` defines **when** a hint (model, compact, review) appears.
 It was chosen on the selection page claude.ai/artifact/HT297XCCqrRVF6rmUcbPrY (2026-11-03).

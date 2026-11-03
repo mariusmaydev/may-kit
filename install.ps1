@@ -53,15 +53,17 @@ foreach ($l in $links) {
     }
 }
 
-# Activate the output style in ~/.claude/settings.json. Node rewrites the JSON, because
+# Activate the output style and the mods in ~/.claude/settings.json. Node rewrites the JSON, because
 # PowerShell 5.1's ConvertTo-Json truncates nesting and escapes umlauts. A backup is kept.
 $outputStyle = 'Marius'
 $settings = Join-Path $target 'settings.json'
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     Write-Host "übersprungen outputStyle: node fehlt — von Hand \"outputStyle\": \"$outputStyle\" setzen"
 } else {
+    # Every folder under mods/ is loaded by every new session via env.CLAUDE_CODE_PLUGIN_DIRS.
+    $mods = @(Get-ChildItem (Join-Path $repo 'mods') -Directory -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
     # The JS lives in its own file: PowerShell 5.1 strips quotes from inline `node -e` arguments.
-    node (Join-Path $repo 'set-output-style.cjs') $settings $outputStyle $stamp
+    node (Join-Path $repo 'set-user-settings.cjs') $settings $stamp $outputStyle @mods
     if ($LASTEXITCODE -ne 0) { throw "settings.json konnte nicht gelesen werden — Sicherung liegt daneben." }
 }
 
