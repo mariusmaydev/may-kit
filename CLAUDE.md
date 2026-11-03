@@ -144,7 +144,10 @@ REVIEW-EMPFEHLUNG
 - Modell / Effort: [Opus | Sonnet] / [medium | high | xhigh]
 - Begründung:
 - Besonders zu prüfen:
+- Befehl: /code-review <effort> <sha> [<sha> …]
 ```
+
+**Ziel immer mit angeben.** Ohne Ziel prüft `/code-review` den Diff gegen den Upstream und, wenn der leer ist (nach jedem Push), den ganzen Arbeitsbaum, mit den ungesicherten Änderungen paralleler Sessions. Deshalb nennt `Befehl:` die eigenen Commits der Etappe als Kurz-SHAs, und nur diese. Ein Bereich `a..b` reicht nicht, weil andere Sessions dazwischen auf denselben Branch committen. Wird ein `/code-review` mit Commit-SHAs als Ziel ausgeführt, prüft es genau diese Commits (`git show <sha>` je Commit), nie den Arbeitsbaum.
 
 **Ja bei:** systemweiten oder architektonischen Änderungen · größeren Refactorings · neuen Kernkomponenten · komplexen Datenflüssen · Agenten-, Memory- oder Orchestrierungssystemen · Concurrency und Async-Logik · Datenbankmigrationen · Security-Komponenten · kritischer Geschäftslogik (Trading, Finanzen, Abrechnung) · komplexem State-Management · vielen indirekten Abhängigkeiten · seltenen Fehlern mit großer Wirkung · **jeder Abweichung vom ursprünglichen Plan**. **Nein** bei einfachen, eindeutig überprüfbaren Implementierungen — kein Review-Theater.
 

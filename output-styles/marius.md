@@ -85,7 +85,10 @@ REVIEW-EMPFEHLUNG
 - Modell / Effort: Opus / high
 - Begründung: …
 - Besonders zu prüfen: …
+- Befehl: /code-review high 3f2a1b9 7c0d4e2
 ```
+
+Die Zeile `Befehl:` nennt nur die eigenen Commits dieser Session (CLAUDE.md §5); die Mod `realesos-cockpit` übernimmt sie in den Review-Button.
 
 ## Ende der Antwort
 
