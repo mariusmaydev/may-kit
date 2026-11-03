@@ -12,7 +12,7 @@ the config applies in every workspace automatically — no per-repo setup.
 |---|---|---|
 | `CLAUDE.md` | `~/.claude/CLAUDE.md` | Global working rules (planning, model choice, review) |
 | `output-styles/` | `~/.claude/output-styles/` | Custom output styles; `Marius` is the active one |
-| `mods/<name>/` | `env.CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json` | Claude Code mods, loaded by every new session; `cockpit` = Review → Komprimieren buttons above the prompt |
+| `mods/<name>/` | `env.CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json` | Claude Code mods, loaded by every new session; `cockpit` = buttons above the prompt: Review → Komprimieren, Live (release to production, where the repo has `scripts/merge.ps1`) and ⚡ (the repo's `.claude/arbeitsmodus`: grey careful, yellow fast) |
 | — | `"outputStyle": "Marius"` in `~/.claude/settings.json` | Set by `install.ps1` via `set-user-settings.cjs` (needs Node); only these two keys change |
 
 Check a mod after editing: `claude plugin validate mods/<name>` and `claude plugin test mods/<name>`.

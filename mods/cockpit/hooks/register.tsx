@@ -15,6 +15,11 @@ import type { Hinweis } from '../types'
 // The state scan needs string literals here, not a constant.
 const hinweis = atom({ plugin: 'cockpit', key: 'hinweis' } as const, null, { shape: 'hinweis-2' })
 const komprimiert = atom({ plugin: 'cockpit', key: 'komprimiert' } as const, false)
+// The repo's working mode (`.claude/arbeitsmodus`, CLAUDE.md "Arbeitsmodus"), null where the repo has none.
+const modus = atom({ plugin: 'cockpit', key: 'modus' } as const, null)
+// Whether the repo has the release script, and whether a release the Live button sent still runs.
+const hatRelease = atom({ plugin: 'cockpit', key: 'hatRelease' } as const, false)
+const releaseLaeuft = atom({ plugin: 'cockpit', key: 'releaseLaeuft' } as const, false)
 
 type Dollar = CoreEngineInterface
 
@@ -27,7 +32,7 @@ const SPERRE_MS = 30_000
 // A double click's second press, for the tick-off on the spinner; longer, it would block the
 // way out exactly when an action hangs.
 const DOPPELKLICK_MS = 1_500
-type Sperre = { art: 'review' | 'compact'; seit: number }
+type Sperre = { art: 'review' | 'compact' | 'release' | 'modus'; seit: number }
 let unterwegs: Sperre | null = null
 /** The action still handing over, or null once none is or the lock has lapsed. */
 const sperre = () => (unterwegs && Date.now() - unterwegs.seit < SPERRE_MS ? unterwegs.art : null)
@@ -38,7 +43,8 @@ const sperren = (art: Sperre['art']): Sperre => (unterwegs = { art, seit: Date.n
 const freigeben = (s: Sperre) => {
   if (unterwegs === s) unterwegs = null
 }
-const schonUnterwegs = (art: 'review' | 'compact') => (art === 'compact' ? 'Es wird schon komprimiert' : 'Das Review wird schon gestartet')
+const schonUnterwegs = (art: Sperre['art']) =>
+  ({ review: 'Das Review wird schon gestartet', compact: 'Es wird schon komprimiert', release: 'Der Release wird schon gestartet', modus: 'Der Modus wird schon umgestellt' })[art]
 
 /** The "Review starten" order for a REVIEW-EMPFEHLUNG, only when it names commits. */
 export function reviewAus(antwort: string): string | null {
@@ -51,6 +57,18 @@ export function reviewAus(antwort: string): string | null {
   const effort = (m?.[2] ?? 'high').toLowerCase()
   return `Review starten: Commits ${shas.join(' ')}, Subagent ${modell}/${effort}. Befunde in deinen Dateien beheben, testen, committen.`
 }
+
+/** The order the Live button sends: the release procedure of the repo's CLAUDE.md. */
+export const RELEASE_BEFEHL = 'Release nach production'
+
+/** Whether a submitted prompt starts a release to production. */
+export const startetRelease = (text: string) => /^\s*Release nach production\b/i.test(text)
+
+/** The mode in `.claude/arbeitsmodus`; anything but `schnell` counts as `sorgfaeltig` (CLAUDE.md). */
+export const modusAus = (text: string): 'schnell' | 'sorgfaeltig' => (text.trim() === 'schnell' ? 'schnell' : 'sorgfaeltig')
+
+/** The order the lightning button sends to switch the mode (CLAUDE.md: the session writes and commits it). */
+export const modusBefehl = (jetzt: 'schnell' | 'sorgfaeltig' | null) => (jetzt === 'schnell' ? 'Modus sorgfältig' : 'Modus schnell')
 
 /** Whether a submitted prompt starts the review. */
 export const startetReview = (text: string, befehl?: string) =>
@@ -91,6 +109,32 @@ export function nachAntwort(alt: Hinweis | null, antwort: string, agentenLaufen 
   // the row goes neutral rather than claiming a finished review.
   if (laeuft && !agentenLaufen) return null
   return alt
+}
+
+/** Reads the repo's mode and release script into the atoms; at session start and after each turn. */
+async function umgebungLesen($: Dollar) {
+  const m = await $.fs.read('.claude/arbeitsmodus').then(t => modusAus(String(t)), () => null)
+  const r = await $.fs.exists('scripts/merge.ps1').catch(() => false)
+  if ((await read($, modus)) !== m) await update($, modus, () => m).catch(() => undefined)
+  if ((await read($, hatRelease)) !== r) await update($, hatRelease, () => r).catch(() => undefined)
+}
+
+// Live and lightning: the order goes out as the person's own prompt, like the review's. The
+// session runs it by the repo's CLAUDE.md (release procedure, mode switch with commit).
+async function befehlSenden($: Dollar, text: string, s: Sperre, istRelease = false) {
+  try {
+    if (istRelease) await update($, releaseLaeuft, () => true).catch(() => undefined)
+    const r = await $.prompt.submit({ text, asUser: true })
+    if (r.drop !== undefined) {
+      if (istRelease) await update($, releaseLaeuft, () => false).catch(() => undefined)
+      $.ui.toast(`Nicht gesendet: ${r.drop}`)
+    }
+  } catch (err) {
+    if (istRelease) await update($, releaseLaeuft, () => false).catch(() => undefined)
+    $.ui.toast(`Nicht gesendet: ${err instanceof Error ? err.message : String(err)}`)
+  } finally {
+    freigeben(s)
+  }
 }
 
 /** Whether a subagent the main loop started is still at work. */
@@ -175,7 +219,14 @@ const SPINNER =
   '</path></svg>'
 
 export const register: Register = on => {
+  on('session.start', async ($, e, next) => {
+    const r = await next(e)
+    void umgebungLesen($).catch(() => undefined)
+    return r
+  })
+
   on('prompt.submit', async ($, e, next) => {
+    if (startetRelease(e.text)) await update($, releaseLaeuft, () => true).catch(() => undefined)
     if (startetReview(e.text, e.command?.name)) {
       await update($, hinweis, (alt): Hinweis | null => (alt && alt.phase === 'review' ? { ...alt, phase: 'review-laeuft' } : alt)).catch(() => undefined)
     }
@@ -186,7 +237,11 @@ export const register: Register = on => {
     if (e.agentId === undefined) {
       try {
         const alt = await read($, hinweis)
-        const neu = nachAntwort(alt, await letzteAntwort($), alt?.phase === 'review-laeuft' && (await agentenLaufen($)))
+        const laufen = await agentenLaufen($)
+        const neu = nachAntwort(alt, await letzteAntwort($), alt?.phase === 'review-laeuft' && laufen)
+        // a release runs within its turn (merge script, deploys); once no subagent works on, it is done
+        if (!laufen && (await read($, releaseLaeuft))) await update($, releaseLaeuft, () => false).catch(() => undefined)
+        await umgebungLesen($).catch(() => undefined)
         if (JSON.stringify(neu) !== JSON.stringify(alt)) await update($, hinweis, () => neu)
       } catch {
         // reading the transcript failed: keep the buttons as they were
@@ -214,6 +269,10 @@ export const register: Register = on => {
     // Never name a variable `h`: JSX compiles to the global `h`, a local one shadows it.
     const stand = await read($, hinweis)
     const laeuftCompact = await read($, komprimiert)
+    const modusJetzt = await read($, modus)
+    const mitRelease = await read($, hatRelease)
+    const laeuftRelease = await read($, releaseLaeuft)
+    const schnell = modusJetzt === 'schnell'
     const els = $.ui.resolve(e)
     const { Box, Text, Button } = els
     const Svg = 'Svg' in els ? (els.Svg as ElementConstructor<SvgProps>) : undefined
@@ -228,7 +287,7 @@ export const register: Register = on => {
 
     // Spinner plus the running action's name as a plain button: pressed, it clears the indicator
     // by hand, the way out when the end never got reported (a reload, a process that died).
-    const laedt = (key: 'review' | 'compact', text: string, onPress: () => void) => (
+    const laedt = (key: 'review' | 'compact' | 'live', text: string, onPress: () => void) => (
       <Box key={`${key}-laeuft`} flexDirection="row" alignItems="center" columnGap={1}>
         {Svg ? <Svg source={SPINNER} alt="" width={12} height={12} /> : <Text dimColor>◌</Text>}
         <Button key={key} label={text} plain dimColor onPress={onPress} />
@@ -271,6 +330,23 @@ export const register: Register = on => {
       void komprimieren($, befehl, s)
     }
 
+    const liveDruecken = () => {
+      if (arbeitet) return $.ui.toast('Claude arbeitet noch, danach nochmal')
+      const r = sperre()
+      if (r) return $.ui.toast(schonUnterwegs(r))
+      void befehlSenden($, RELEASE_BEFEHL, sperren('release'), true)
+    }
+    const releaseAbhaken = () => {
+      if (doppelklick('release')) return
+      void update($, releaseLaeuft, () => false).catch(() => undefined)
+    }
+    const blitzDruecken = () => {
+      if (arbeitet) return $.ui.toast('Claude arbeitet noch, danach nochmal')
+      const r = sperre()
+      if (r) return $.ui.toast(schonUnterwegs(r))
+      void befehlSenden($, modusBefehl(modusJetzt), sperren('modus'))
+    }
+
     const compactAbhaken = () => {
       if (doppelklick('compact')) return
       void update($, komprimiert, () => false).catch(() => undefined)
@@ -300,6 +376,19 @@ export const register: Register = on => {
             onPress={compactDruecken}
           />
         )}
+        {mitRelease ? (
+          laeuftRelease ? (
+            laedt('live', 'Live läuft', releaseAbhaken)
+          ) : (
+            <Button key="live" label="Live" variant="secondary" dimColor onPress={liveDruecken} />
+          )
+        ) : null}
+        {modusJetzt !== null ? (
+          // Grey: careful mode. Yellow: fast mode, every finished change goes to production unasked.
+          <Button key="blitz" label={schnell ? 'Schnellmodus an' : 'Schnellmodus aus'} variant="secondary" onPress={blitzDruecken}>
+            {schnell ? <Text color="warning">⚡</Text> : <Text dimColor>⚡</Text>}
+          </Button>
+        ) : null}
       </Box>
     )
   })

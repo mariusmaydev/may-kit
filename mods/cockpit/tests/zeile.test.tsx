@@ -159,3 +159,28 @@ test('a second press on the spinner right after the start keeps the review runni
   await vorher.unmount()
 })
 
+// 2026-11-03: Live sends the release order, the lightning switches the repo's mode.
+test('Live sends the release order; the lightning shows the mode and switches it', async ($, on) => {
+  const gesendet: string[] = []
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('prompt.submit', (_, e) => {
+    gesendet.push(e.text)
+    return { text: e.text }
+  })
+  on('ui.toast', () => ({ value: undefined }) as never)
+  // The repo as the mod reads it: careful mode, release script present. The engine hands the
+  // hooks the path resolved against the working directory.
+  const pfad = (p: string) => p.split(String.fromCharCode(92)).join('/')
+  on('fs.read', (_, e, next) => (pfad(e.path).endsWith('/.claude/arbeitsmodus') ? ({ value: 'sorgfaeltig' } as never) : next(e)))
+  on('fs.exists', (_, e, next) => (pfad(e.path).endsWith('/scripts/merge.ps1') ? ({ value: true } as never) : next(e)))
+  await $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
+
+  await new Promise(r => setTimeout(r, 20)) // session.start reads the repo without holding the start
+  const ui = await $.ui.mount({ ...BAND, surface: 'vscode' })
+  expect((await ui.find({ key: 'blitz' }))?.props.label).toBe('Schnellmodus aus')
+  await ui.press({ key: 'blitz' })
+  await ui.press({ key: 'live' })
+  expect(gesendet).toEqual(['Modus schnell', 'Release nach production'])
+  await ui.unmount()
+})
+

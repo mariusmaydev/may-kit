@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { compactAnweisung, compactAus, komprimieren, nachAntwort, reviewAus, startetReview } from '../hooks/register'
+import { compactAnweisung, compactAus, komprimieren, modusAus, modusBefehl, nachAntwort, reviewAus, startetRelease, startetReview } from '../hooks/register'
 
 const REVIEW = [
   'Fertig: E12.c auf Dev.',
@@ -125,3 +125,17 @@ test('a refused /compact command is reported', async () => {
   expect(a.befehle).toEqual([{ command: 'compact', args: '' }])
   expect(a.toasts).toEqual(['Nicht komprimiert: unknown command'])
 })
+
+test('the mode file: only "schnell" is fast, anything else careful (CLAUDE.md)', async () => {
+  expect(modusAus(`schnell${String.fromCharCode(10)}`)).toBe('schnell')
+  expect(modusAus('sorgfaeltig')).toBe('sorgfaeltig')
+  expect(modusAus('Schnell')).toBe('sorgfaeltig')
+  expect(modusBefehl('schnell')).toBe('Modus sorgfältig')
+  expect(modusBefehl('sorgfaeltig')).toBe('Modus schnell')
+})
+
+test('a typed or sent release order counts as a release start', async () => {
+  expect(startetRelease('Release nach production')).toBe(true)
+  expect(startetRelease('Wann kommt der Release nach production?')).toBe(false)
+})
+
