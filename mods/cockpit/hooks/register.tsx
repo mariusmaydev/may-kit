@@ -18,6 +18,12 @@ const komprimiert = atom({ plugin: 'cockpit', key: 'komprimiert' } as const, fal
 
 type Dollar = CoreEngineInterface
 
+// Set from the press until the action has handed over (review: the prompt accepted; compact: the
+// compaction finished). A second press inside that window would send a second review order or a
+// second /compact; the stored state only redraws after the press, so it cannot guard this.
+// A module variable on purpose: a reload starts it over, so it can never hang the buttons.
+let unterwegs: 'review' | 'compact' | null = null
+
 /** The "Review starten" order for a REVIEW-EMPFEHLUNG, only when it names commits. */
 export function reviewAus(antwort: string): string | null {
   if (!/REVIEW-EMPFEHLUNG/.test(antwort) || !/Opus-Review empfohlen:\s*Ja/i.test(antwort)) return null
@@ -79,6 +85,14 @@ const zurueck = ($: Dollar, alt: Hinweis | null) => update($, hinweis, () => alt
 // Review: the order goes out as the person's own prompt, nothing lands in the prompt box.
 // The state flips first so the spinner shows at once, and flips back if the prompt is refused.
 async function reviewSenden($: Dollar, stand: Hinweis, befehl: string) {
+  try {
+    await reviewAbschicken($, stand, befehl)
+  } finally {
+    unterwegs = null
+  }
+}
+
+async function reviewAbschicken($: Dollar, stand: Hinweis, befehl: string) {
   await update($, hinweis, (): Hinweis => ({ ...stand, phase: 'review-laeuft' })).catch(() => undefined)
   try {
     const r = await $.prompt.submit({ text: befehl, asUser: true })
@@ -94,7 +108,15 @@ async function reviewSenden($: Dollar, stand: Hinweis, befehl: string) {
 
 // Compact: straight through the engine, as /compact does. The session.compact hook
 // below shows the spinner and clears the hint once the compaction stands.
-async function komprimieren($: Dollar, befehl: string | null) {
+export async function komprimieren($: Dollar, befehl: string | null) {
+  try {
+    await verdichten($, befehl)
+  } finally {
+    unterwegs = null
+  }
+}
+
+async function verdichten($: Dollar, befehl: string | null) {
   try {
     const r = await $.session.compact({ instructions: compactAnweisung(befehl) })
     if (r.skip !== undefined) $.ui.toast(`Nicht komprimiert: ${r.skip}`)
@@ -103,7 +125,9 @@ async function komprimieren($: Dollar, befehl: string | null) {
     // The VS Code extension runs an SDK session: there compaction only runs as a /compact prompt
     // inside a turn ("not available in a headless (-p / SDK) session"). Run /compact as the
     // person would type it ($.prompt.submit refuses a text starting with "/").
-    if (/headless|SDK/i.test(grund)) {
+    // Matched on "headless" alone: "SDK" also stands in API errors (@anthropic-ai/sdk), which a
+    // second attempt would only hide.
+    if (/headless/i.test(grund)) {
       await $.command
         .run({ command: 'compact', args: compactAnweisung(befehl) ?? '' })
         .catch((e2: unknown) => $.ui.toast(`Nicht komprimiert: ${e2 instanceof Error ? e2.message : String(e2)}`))
@@ -173,10 +197,12 @@ export const register: Register = on => {
     const reviewBefehl = stand?.reviewBefehl ?? null
     const compactBefehl = stand?.compactBefehl ?? null
 
-    const laedt = (key: string, text: string) => (
-      <Box key={key} flexDirection="row" alignItems="center" columnGap={1}>
+    // Spinner plus the running action's name as a plain button: pressed, it clears the indicator
+    // by hand, the way out when the end never got reported (a reload, a process that died).
+    const laedt = (key: 'review' | 'compact', text: string, onPress: () => void) => (
+      <Box key={`${key}-laeuft`} flexDirection="row" alignItems="center" columnGap={1}>
         {Svg ? <Svg source={SPINNER} alt="" width={12} height={12} /> : <Text dimColor>◌</Text>}
-        <Text dimColor>{text}</Text>
+        <Button key={key} label={text} plain dimColor onPress={onPress} />
       </Box>
     )
 
@@ -184,8 +210,13 @@ export const register: Register = on => {
     // the press reads the last answer itself, so the buttons never depend on what was stored.
     const reviewDruecken = async () => {
       if (arbeitet) return $.ui.toast('Claude arbeitet noch, danach nochmal')
+      if (unterwegs) return $.ui.toast(unterwegs === 'review' ? 'Das Review wird schon gestartet' : 'Es wird schon komprimiert')
+      unterwegs = 'review'
       const jetzt = stand && reviewBefehl ? stand : nachAntwort(null, await letzteAntwort($).catch(() => ''))
-      if (!jetzt?.reviewBefehl || jetzt.phase !== 'review') return $.ui.toast('Kein Review empfohlen')
+      if (!jetzt?.reviewBefehl || jetzt.phase !== 'review') {
+        unterwegs = null
+        return $.ui.toast('Kein Review empfohlen')
+      }
       void reviewSenden($, jetzt, jetzt.reviewBefehl) // not awaited, as with compacting below
     }
     const reviewAbhaken = () => {
@@ -198,21 +229,22 @@ export const register: Register = on => {
       if (reviewDran) return $.ui.toast('Erst das Review')
       if (reviewLaeuft) return $.ui.toast('Das Review läuft noch')
       if (arbeitet) return $.ui.toast('Claude arbeitet noch, danach nochmal')
+      if (unterwegs) return $.ui.toast(unterwegs === 'compact' ? 'Es wird schon komprimiert' : 'Das Review wird schon gestartet')
+      unterwegs = 'compact'
       const befehl = compactBefehl ?? compactAus(await letzteAntwort($).catch(() => ''))
       // Not awaited: a press has 10 s, a compaction takes longer (2026-11-03 "ui.press hook
       // skipped: ran past its 10s budget"). The engine lets work a press leaves running finish.
       void komprimieren($, befehl)
     }
 
+    const compactAbhaken = () => {
+      void update($, komprimiert, () => false).catch(() => undefined)
+    }
+
     return (
       <Box flexDirection="row" alignItems="center" columnGap={1}>
         {reviewLaeuft ? (
-          // The spinner's text is a plain button: pressed, it ticks the review off by hand,
-          // the way out when no answer reported the result (or one came before a reload).
-          <Box key="review-laeuft" flexDirection="row" alignItems="center" columnGap={1}>
-            {Svg ? <Svg source={SPINNER} alt="" width={12} height={12} /> : <Text dimColor>◌</Text>}
-            <Button key="review" label="Review läuft" plain dimColor onPress={reviewAbhaken} />
-          </Box>
+          laedt('review', 'Review läuft', reviewAbhaken)
         ) : (
           <Button
             key="review"
@@ -223,7 +255,7 @@ export const register: Register = on => {
           />
         )}
         {laeuftCompact ? (
-          laedt('compact-laeuft', 'Komprimiere')
+          laedt('compact', 'Komprimiere', compactAbhaken)
         ) : (
           <Button
             key="compact"

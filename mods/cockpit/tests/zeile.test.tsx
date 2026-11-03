@@ -73,3 +73,45 @@ test('a press while Claude works sends nothing; once idle, one press sends the o
   expect((await abgehakt.find({ key: 'compact' }))?.props.variant).toBe('primary')
   await abgehakt.unmount()
 })
+
+// Review 2026-11-03 (M1/M2): two quick presses, before the row redraws, start one action only.
+test('two quick presses on Review send the order once', async ($, on) => {
+  const gesendet: string[] = []
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('prompt.submit', (_, e) => {
+    gesendet.push(e.text)
+    return { text: e.text }
+  })
+  on('ui.toast', () => ({ value: undefined }) as never)
+  const mem = new Map<string, { value: unknown; version: number }>([
+    ['hinweis', { value: { shape: 'hinweis-2', value: { phase: 'review', reviewBefehl: ORDER, compactBefehl: null, reviewErledigt: false } }, version: 1 }],
+  ])
+  on('state.get', (_, e, next) => (mem.has(e.key) ? ({ value: mem.get(e.key) } as never) : next(e)))
+  on('state.set', (_, e, next) => {
+    mem.delete(e.key)
+    return next(e)
+  })
+  await $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'vscode' })
+  await Promise.all([ui.press({ key: 'review' }), ui.press({ key: 'review' })])
+  expect(gesendet).toEqual([ORDER])
+  await ui.unmount()
+})
+
+// Review 2026-11-03 (M1): two quick presses on Komprimieren compact once.
+test('two quick presses on Komprimieren compact once', async ($, on) => {
+  let verdichtet = 0
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.compact', (_, e, next) => {
+    verdichtet++
+    return next(e)
+  })
+  on('ui.toast', () => ({ value: undefined }) as never)
+  await $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'vscode' })
+  await Promise.all([ui.press({ key: 'compact' }), ui.press({ key: 'compact' })])
+  expect(verdichtet).toBe(1)
+  await ui.unmount()
+})

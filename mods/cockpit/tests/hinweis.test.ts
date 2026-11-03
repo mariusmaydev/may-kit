@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { compactAnweisung, compactAus, nachAntwort, reviewAus, startetReview } from '../hooks/register'
+import { compactAnweisung, compactAus, komprimieren, nachAntwort, reviewAus, startetReview } from '../hooks/register'
 
 const REVIEW = [
   'Fertig: E12.c auf Dev.',
@@ -78,4 +78,31 @@ test('the compact button passes only the instructions after /compact', async () 
 
 test('an answer without a hint leaves the state as it was', async () => {
   expect(nachAntwort(null, 'Alles erledigt.')).toBe(null)
+})
+
+// Review 2026-11-03 (H2, N1): the test engine has no SDK session, so the fallback is driven
+// through a stand-in for `$` holding just what komprimieren calls.
+function attrappe(fehler: string) {
+  const befehle: unknown[] = []
+  const toasts: string[] = []
+  const $ = {
+    session: { compact: () => Promise.reject(new Error(fehler)) },
+    command: { run: (a: unknown) => (befehle.push(a), Promise.resolve({ text: '' })) },
+    ui: { toast: (t: string) => void toasts.push(t) },
+  }
+  return { $: $ as unknown as Parameters<typeof komprimieren>[0], befehle, toasts }
+}
+
+test('a headless refusal runs /compact as a command, with the instructions', async () => {
+  const a = attrappe('Compaction is not available in a headless (-p / SDK) session')
+  await komprimieren(a.$, '/compact Weiter mit E12.d')
+  expect(a.befehle).toEqual([{ command: 'compact', args: 'Weiter mit E12.d' }])
+  expect(a.toasts).toEqual([])
+})
+
+test('any other error, even one naming the SDK, is reported, not retried', async () => {
+  const a = attrappe('@anthropic-ai/sdk: 529 overloaded')
+  await komprimieren(a.$, null)
+  expect(a.befehle).toEqual([])
+  expect(a.toasts).toEqual(['Nicht komprimiert: @anthropic-ai/sdk: 529 overloaded'])
 })
