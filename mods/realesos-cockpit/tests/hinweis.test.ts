@@ -56,6 +56,15 @@ test('after the review ran, a compact hint makes compact due with review ticked'
   expect(h?.reviewErledigt).toBe(true)
 })
 
+test('the result table of a running review ticks it off, even without a compact hint', async () => {
+  const laeuft = { phase: 'review-laeuft' as const, reviewBefehl: 'Review starten: Commits 3f2a1b9', compactBefehl: null, reviewErledigt: false }
+  const h = nachAntwort(laeuft, '| Befund | Ergebnis |\n|---|---|\n| 1 | behoben |')
+  expect(h?.phase).toBe('compact')
+  expect(h?.reviewErledigt).toBe(true)
+  // the same table without a running review changes nothing
+  expect(nachAntwort(null, '| Befund | Ergebnis |')).toBe(null)
+})
+
 test('a compact hint while the review is still open keeps review due', async () => {
   const offen = { phase: 'review' as const, reviewBefehl: '/code-review high 3f2a1b9', compactBefehl: null, reviewErledigt: false }
   expect(nachAntwort(offen, COMPACT)?.phase).toBe('review')
