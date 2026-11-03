@@ -26,9 +26,10 @@ foreach ($l in $links) {
     if (-not (Test-Path $src)) { throw "Fehlt im Repo: $src" }
 
     $existing = Get-Item $dest -Force -ErrorAction SilentlyContinue
+    $backup = $null
     if ($existing) {
         if ($existing.LinkType -and ($existing.Target | Select-Object -First 1) -eq $src) {
-            Write-Host "ok      $($l.Source) (zeigt schon hierher)"
+            Write-Host "ok        $($l.Source) (zeigt schon hierher)"
             continue
         }
         $backup = "$dest.bak-$stamp"
@@ -36,16 +37,19 @@ foreach ($l in $links) {
         Write-Host "gesichert $($l.Source) -> $(Split-Path $backup -Leaf)"
     }
 
-    try {
-        New-Item -ItemType SymbolicLink -Path $dest -Target $src | Out-Null
-        Write-Host "verlinkt $($l.Source) (Symlink)"
-    } catch {
-        if ($l.Kind -eq 'Directory') {
-            New-Item -ItemType Junction -Path $dest -Target $src | Out-Null
-            Write-Host "verlinkt $($l.Source) (Junction)"
-        } else {
-            throw "Symlink für $($l.Source) nicht möglich — Entwicklermodus einschalten oder als Admin ausführen."
-        }
+    # mklink honours Developer Mode; New-Item -ItemType SymbolicLink in PowerShell 5.1 does not.
+    $flag = if ($l.Kind -eq 'Directory') { '/D' } else { '' }
+    cmd /c "mklink $flag `"$dest`" `"$src`"" | Out-Null
+    if (-not (Test-Path $dest) -and $l.Kind -eq 'Directory') {
+        cmd /c "mklink /J `"$dest`" `"$src`"" | Out-Null
+    }
+
+    if (Test-Path $dest) {
+        Write-Host "verlinkt  $($l.Source)"
+    } else {
+        # Never leave ~/.claude without the file: put the backup back before failing.
+        if ($backup) { Move-Item $backup $dest; Write-Host "zurück    $($l.Source) (Sicherung wiederhergestellt)" }
+        throw "Link für $($l.Source) nicht möglich — Windows-Entwicklermodus einschalten oder als Admin ausführen."
     }
 }
 
