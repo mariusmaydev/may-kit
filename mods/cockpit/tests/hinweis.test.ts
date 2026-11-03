@@ -65,6 +65,16 @@ test('the result table of a running review ticks it off, even without a compact 
   expect(nachAntwort(null, '| Befund | Ergebnis |')).toBe(null)
 })
 
+// 2026-11-03: the review ended without a result table (no such commit) and the spinner stayed.
+test('a running review ends when no subagent works any more, even without a result table', async () => {
+  const laeuft = { phase: 'review-laeuft' as const, reviewBefehl: 'Review starten: Commits 3f2a1b9', compactBefehl: null, reviewErledigt: false }
+  const antwort = 'Ich habe kein Review gestartet, weil es den Commit nicht gibt.'
+  // the reviewer still runs in the background: keep the spinner
+  expect(nachAntwort(laeuft, 'Das Review läuft gerade.', true)).toEqual(laeuft)
+  // nothing runs any more: the row goes neutral, no tick
+  expect(nachAntwort(laeuft, antwort, false)).toBe(null)
+})
+
 test('a compact hint while the review is still open keeps review due', async () => {
   const offen = { phase: 'review' as const, reviewBefehl: '/code-review high 3f2a1b9', compactBefehl: null, reviewErledigt: false }
   expect(nachAntwort(offen, COMPACT)?.phase).toBe('review')

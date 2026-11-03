@@ -71,8 +71,11 @@ export function compactAnweisung(befehl: string | null): string | undefined {
 /** Whether an answer reports the review's result (the table "Befund | Ergebnis", §5 step 3). */
 const meldetReview = (antwort: string) => /\|\s*Befund\s*\|\s*Ergebnis\s*\|/.test(antwort)
 
-/** Next state after an answer; `alt` is the state before it. */
-export function nachAntwort(alt: Hinweis | null, antwort: string): Hinweis | null {
+/**
+ * Next state after an answer; `alt` is the state before it. `agentenLaufen`: a subagent of the
+ * main loop is still at work (the review's reviewer runs in the background past the turn).
+ */
+export function nachAntwort(alt: Hinweis | null, antwort: string, agentenLaufen = false): Hinweis | null {
   const review = reviewAus(antwort)
   const compact = compactAus(antwort)
   // A review recommendation always comes first, even if the same answer also offers /compact.
@@ -83,7 +86,17 @@ export function nachAntwort(alt: Hinweis | null, antwort: string): Hinweis | nul
     const erledigt = laeuft || alt?.reviewErledigt === true
     return { phase: 'compact', reviewBefehl: alt?.reviewBefehl ?? null, compactBefehl: compact ?? alt?.compactBefehl ?? null, reviewErledigt: erledigt }
   }
+  // 2026-11-03: a review that ended without a result table (refused, no commits found, answered
+  // otherwise) kept the spinner for good. With no subagent left at work, nothing runs any more:
+  // the row goes neutral rather than claiming a finished review.
+  if (laeuft && !agentenLaufen) return null
   return alt
+}
+
+/** Whether a subagent the main loop started is still at work. */
+async function agentenLaufen($: Dollar): Promise<boolean> {
+  const agenten = await $.agent.list().catch(() => [])
+  return agenten.some(a => a.parentId === undefined && (a.status === 'pending' || a.status === 'running' || a.status === 'waiting'))
 }
 
 async function letzteAntwort($: Dollar): Promise<string> {
@@ -173,7 +186,7 @@ export const register: Register = on => {
     if (e.agentId === undefined) {
       try {
         const alt = await read($, hinweis)
-        const neu = nachAntwort(alt, await letzteAntwort($))
+        const neu = nachAntwort(alt, await letzteAntwort($), alt?.phase === 'review-laeuft' && (await agentenLaufen($)))
         if (JSON.stringify(neu) !== JSON.stringify(alt)) await update($, hinweis, () => neu)
       } catch {
         // reading the transcript failed: keep the buttons as they were
