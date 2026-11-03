@@ -334,9 +334,9 @@ export async function modellZuruecksetzen($: Dollar, v: Vorher, s?: Sperre) {
   }
 }
 
-// The lightning: U+03DF (koppa), a text glyph shaped like a bolt. A Button holds only text, so
-// no SVG icon; and U+26A1 draws as an emoji, which the person does not want.
-const BLITZ = 'ϟ'
+// The mode button's word. A Button holds only text (no SVG icon), U+26A1 draws as an emoji and a
+// bolt-shaped glyph (U+03DF) looked wrong (the person, 2026-11-03): one short word, coloured.
+const BLITZ = 'Schnell'
 
 // A small turning arc, grey at half strength so it reads on light and dark themes.
 const SPINNER =
@@ -585,9 +585,9 @@ export const register: Register = on => {
         {modusJetzt !== null
           ? mitTipp(
               'blitz',
-              // Only the glyph, no label (the person's wish, 2026-11-03: a label draws as a long button).
+              // One word, no "an"/"aus" (the person's wish, 2026-11-03: the label drew as a long button).
               // Grey: careful mode. Yellow: fast mode, every finished change goes to production unasked.
-              <Button key="blitz" plain onPress={blitzDruecken}>
+              <Button key="blitz" variant="secondary" onPress={blitzDruecken}>
                 {schnell ? <Text color="warning">{BLITZ}</Text> : <Text dimColor>{BLITZ}</Text>}
               </Button>,
             )

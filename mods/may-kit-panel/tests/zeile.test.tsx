@@ -177,10 +177,8 @@ test('Live sends the release order; the lightning shows the mode and switches it
 
   await new Promise(r => setTimeout(r, 20)) // session.start reads the repo without holding the start
   const ui = await $.ui.mount({ ...BAND, surface: 'vscode' })
-  // only the glyph: no label, which VS Code drew as a long button
-  const blitz = await ui.find({ key: 'blitz' })
-  expect(blitz?.props.label).toBe('ϟ')
-  expect(blitz?.props.plain).toBe(true)
+  // one short word, the colour says on or off
+  expect((await ui.find({ key: 'blitz' }))?.props.label).toBe('Schnell')
   await ui.press({ key: 'blitz' })
   await ui.press({ key: 'live' })
   expect(gesendet).toEqual(['Modus schnell', 'Release nach production'])
