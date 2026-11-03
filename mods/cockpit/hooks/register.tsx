@@ -99,7 +99,16 @@ async function komprimieren($: Dollar, befehl: string | null) {
     const r = await $.session.compact({ instructions: compactAnweisung(befehl) })
     if (r.skip !== undefined) $.ui.toast(`Nicht komprimiert: ${r.skip}`)
   } catch (err) {
-    $.ui.toast(`Nicht komprimiert: ${err instanceof Error ? err.message : String(err)}`)
+    const grund = err instanceof Error ? err.message : String(err)
+    // The VS Code extension runs an SDK session: there compaction only runs as a /compact prompt
+    // inside a turn ("not available in a headless (-p / SDK) session"). Send that prompt instead.
+    if (/headless|SDK/i.test(grund)) {
+      const text = `/compact ${compactAnweisung(befehl) ?? ''}`.trim()
+      const r = await $.prompt.submit({ text, asUser: true }).catch((e2: unknown) => ({ drop: e2 instanceof Error ? e2.message : String(e2) }))
+      if (r.drop !== undefined) $.ui.toast(`Nicht komprimiert: ${r.drop}`)
+      return
+    }
+    $.ui.toast(`Nicht komprimiert: ${grund}`)
   }
 }
 
