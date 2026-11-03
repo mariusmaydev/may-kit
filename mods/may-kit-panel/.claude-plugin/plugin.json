@@ -1,6 +1,6 @@
 {
   "name": "may-kit-panel",
   "version": "0.3.0",
-  "description": "Two buttons above the prompt, Review and Komprimieren, following the hints of the last answer",
+  "description": "Buttons above the prompt (model switch, review, compact, release, working mode) that follow the hints of the last answer",
   "types": "./types/index.d.ts"
 }

@@ -8,7 +8,7 @@ oder kopiere den Teil unter der Linie direkt in den Chat.
 
 ---
 
-Du richtest **may-kit** ein, die Claude-Code-Konfiguration von Marius May: globale Arbeitsregeln (`CLAUDE.md`), den Output-Style `Marius` und die Mod `may-kit-panel` (Knöpfe über dem Prompt: Review, Komprimieren, Live, ⚡, ?). Arbeite die Schritte der Reihe nach ab, melde am Ende in einer Tabelle `Schritt | Ergebnis`, und frag nur, wo unten „fragen“ steht.
+Du richtest **may-kit** ein, die Claude-Code-Konfiguration von Marius May: globale Arbeitsregeln (`CLAUDE.md`), den Output-Style `Marius` und die Mod `may-kit-panel` (Knöpfe über dem Prompt: Modell + Effort, ↺, Review, Komprimieren, Live, ⚡, ?). Arbeite die Schritte der Reihe nach ab, melde am Ende in einer Tabelle `Schritt | Ergebnis`, und frag nur, wo unten „fragen“ steht.
 
 ## 1. Rechner (einmal je Rechner)
 
@@ -18,7 +18,7 @@ Du richtest **may-kit** ein, die Claude-Code-Konfiguration von Marius May: globa
    - `~/.claude/CLAUDE.md` und `~/.claude/output-styles` zeigen ins Repo.
    - `~/.claude/settings.json`: `"outputStyle": "Marius"`, und `CLAUDE_CODE_PLUGIN_DIRS` nennt `…/may-kit/mods/may-kit-panel`.
    - `claude plugin validate <repo>/mods/may-kit-panel` und `claude plugin test <repo>/mods/may-kit-panel` grün.
-4. **Hinweis an Marius:** Die Mod und der Style greifen erst in einem **neuen** Chat.
+4. **Hinweis an den User:** Die Mod und der Style greifen erst in einem **neuen** Chat.
 
 ## 2. Projekt (je Workspace)
 
@@ -28,6 +28,8 @@ Die Knöpfe richten sich nach dem Projekt:
 
 | Knopf | erscheint, wenn | was er auslöst |
 |---|---|---|
+| Modell + Effort | immer; hervorgehoben nach einem `**Weiter:**`-Hinweis | führt `/compact` (falls genannt), `/model` und `/effort` aus und schickt den Auftrag zur Umsetzung (§3) |
+| ↺ | nach einem Wechsel | stellt Modell und Effort von vor dem ersten Wechsel wieder her |
 | Review | immer | schickt „Review starten“ mit den Commits der letzten REVIEW-EMPFEHLUNG (globale `CLAUDE.md` §5) |
 | Komprimieren | immer | komprimiert mit der Anweisung des letzten `/compact`-Hinweises (§3a) |
 | Live | `scripts/merge.ps1` existiert | schickt „Release nach production“; die Projekt-`CLAUDE.md` muss beschreiben, was das heißt |
@@ -46,4 +48,4 @@ Danach nur die eigenen Dateien committen (`git commit --only <pfade>`), nie frem
 
 - Keine Klartext-Credentials in Dateien oder `settings.json`.
 - `~/.claude/settings.json` nur über `install.ps1` bzw. `set-user-settings.cjs` ändern, keine weiteren Schlüssel.
-- Nichts aus dem Repo `may-kit` selbst ändern, außer Marius sagt es; Anpassungen gehören ins Projekt.
+- Nichts aus dem Repo `may-kit` selbst ändern, außer der User sagt es; Anpassungen gehören ins Projekt.
