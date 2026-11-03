@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { CoreEngineInterface, ElementConstructor, Register, SvgProps } from 'claude-code'
+import type { CoreEngineInterface, ElementConstructor, Register, RenderChildren, SvgProps } from 'claude-code'
 
 import type { Hinweis } from '../types'
 
@@ -347,6 +347,40 @@ export const register: Register = on => {
       void befehlSenden($, modusBefehl(modusJetzt), sperren('modus'))
     }
 
+    // Hover help: each button sits in a Box of its hover group; the matching text, drawn hidden
+    // right of the row, shows while the pointer rests on the button (no hook runs, BoxHoverProps).
+    const tipps: Array<[string, string]> = [
+      [
+        'review',
+        reviewLaeuft
+          ? 'Das Review läuft. Ein Klick hakt es von Hand ab.'
+          : 'Schickt „Review starten“ mit den Commits der letzten REVIEW-EMPFEHLUNG: ein Subagent prüft, die Session behebt, testet und committet.',
+      ],
+      [
+        'compact',
+        laeuftCompact
+          ? 'Komprimiert gerade. Ein Klick setzt die Anzeige zurück.'
+          : 'Komprimiert den Chat sofort, mit der Anweisung aus dem letzten /compact-Hinweis (sonst ohne).',
+      ],
+      [
+        'live',
+        laeuftRelease
+          ? 'Der Release läuft. Ein Klick setzt die Anzeige zurück.'
+          : 'Schickt „Release nach production“ sofort ab: Schema und Functions auf Prod, danach merge.ps1 -Production.',
+      ],
+      [
+        'blitz',
+        schnell
+          ? 'Schnellmodus an: jede fertige Änderung geht ungefragt und ungeprüft nach Production, für alle Sessions. Klick schaltet aus.'
+          : 'Schnellmodus aus (sorgfältig). Klick schaltet ein: dann geht jede fertige Änderung ungefragt und ungeprüft nach Production, für alle Sessions.',
+      ],
+    ]
+    const mitTipp = (id: string, inhalt: RenderChildren) => (
+      <Box key={`tipp-${id}`} hover={{ scope: `cockpit-${id}` }}>
+        {inhalt}
+      </Box>
+    )
+
     const compactAbhaken = () => {
       if (doppelklick('compact')) return
       void update($, komprimiert, () => false).catch(() => undefined)
@@ -354,41 +388,58 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="row" alignItems="center" columnGap={1}>
-        {reviewLaeuft ? (
-          laedt('review', 'Review läuft', reviewAbhaken)
-        ) : (
-          <Button
-            key="review"
-            label={reviewErledigt ? '✓ Review' : 'Review'}
-            variant={reviewDran ? 'primary' : 'secondary'}
-            dimColor={!reviewDran}
-            onPress={reviewDruecken}
-          />
-        )}
-        {laeuftCompact ? (
-          laedt('compact', 'Komprimiere', compactAbhaken)
-        ) : (
-          <Button
-            key="compact"
-            label="Komprimieren"
-            variant={compactDran ? 'primary' : 'secondary'}
-            dimColor={!compactDran || reviewLaeuft}
-            onPress={compactDruecken}
-          />
-        )}
-        {mitRelease ? (
-          laeuftRelease ? (
-            laedt('live', 'Live läuft', releaseAbhaken)
+        {mitTipp(
+          'review',
+          reviewLaeuft ? (
+            laedt('review', 'Review läuft', reviewAbhaken)
           ) : (
-            <Button key="live" label="Live" variant="secondary" dimColor onPress={liveDruecken} />
-          )
-        ) : null}
-        {modusJetzt !== null ? (
-          // Grey: careful mode. Yellow: fast mode, every finished change goes to production unasked.
-          <Button key="blitz" label={schnell ? 'Schnellmodus an' : 'Schnellmodus aus'} variant="secondary" onPress={blitzDruecken}>
-            {schnell ? <Text color="warning">⚡</Text> : <Text dimColor>⚡</Text>}
-          </Button>
-        ) : null}
+            <Button
+              key="review"
+              label={reviewErledigt ? '✓ Review' : 'Review'}
+              variant={reviewDran ? 'primary' : 'secondary'}
+              dimColor={!reviewDran}
+              onPress={reviewDruecken}
+            />
+          ),
+        )}
+        {mitTipp(
+          'compact',
+          laeuftCompact ? (
+            laedt('compact', 'Komprimiere', compactAbhaken)
+          ) : (
+            <Button
+              key="compact"
+              label="Komprimieren"
+              variant={compactDran ? 'primary' : 'secondary'}
+              dimColor={!compactDran || reviewLaeuft}
+              onPress={compactDruecken}
+            />
+          ),
+        )}
+        {mitRelease
+          ? mitTipp(
+              'live',
+              laeuftRelease ? (
+                laedt('live', 'Live läuft', releaseAbhaken)
+              ) : (
+                <Button key="live" label="Live" variant="secondary" dimColor onPress={liveDruecken} />
+              ),
+            )
+          : null}
+        {modusJetzt !== null
+          ? mitTipp(
+              'blitz',
+              // Grey: careful mode. Yellow: fast mode, every finished change goes to production unasked.
+              <Button key="blitz" label={schnell ? 'Schnellmodus an' : 'Schnellmodus aus'} variant="secondary" onPress={blitzDruecken}>
+                {schnell ? <Text color="warning">⚡</Text> : <Text dimColor>⚡</Text>}
+              </Button>,
+            )
+          : null}
+        {tipps.map(([id, text]) => (
+          <Box key={`tipptext-${id}`} display="none" hover={{ display: 'flex', scope: `cockpit-${id}` }}>
+            <Text dimColor>{text}</Text>
+          </Box>
+        ))}
       </Box>
     )
   })
