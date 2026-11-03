@@ -121,3 +121,41 @@ test('two quick presses on Komprimieren compact once', async ($, on) => {
   expect(toasts.join()).toContain('Es wird schon komprimiert')
   await ui.unmount()
 })
+
+// Review 2026-11-03 (80f9314, M3): a double click's second press that lands on the spinner after
+// the redraw does not tick the review off while the order is still being handed over.
+test('a second press on the spinner right after the start keeps the review running', async ($, on) => {
+  let freigeben = () => {}
+  const tor = new Promise<void>(r => (freigeben = r))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('prompt.submit', async (_, e) => {
+    await tor
+    return { text: e.text }
+  })
+  on('ui.toast', () => ({ value: undefined }) as never)
+  const mem = new Map<string, { value: unknown; version: number }>([
+    ['hinweis', { value: { shape: 'hinweis-2', value: { phase: 'review', reviewBefehl: ORDER, compactBefehl: null, reviewErledigt: false } }, version: 1 }],
+  ])
+  on('state.get', (_, e, next) => (mem.has(e.key) ? ({ value: mem.get(e.key) } as never) : next(e)))
+  on('state.set', (_, e, next) => {
+    mem.delete(e.key)
+    return next(e)
+  })
+  await $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
+
+  const vorher = await $.ui.mount({ ...BAND, surface: 'vscode' })
+  const erster = vorher.press({ key: 'review' }) // held at the gate: the order is still handing over
+  await new Promise(r => setTimeout(r, 20))
+  // drawn afresh as a second instance, as a redraw would (the first one is still pressed)
+  const spinner = await $.ui.mount({ ...BAND, requestId: 'above-prompt-2', surface: 'vscode' })
+  expect((await spinner.find({ key: 'review' }))?.props.label).toBe('Review läuft')
+  await spinner.press({ key: 'review' })
+  await spinner.unmount()
+  const danach = await $.ui.mount({ ...BAND, requestId: 'above-prompt-3', surface: 'vscode' })
+  expect((await danach.find({ key: 'review' }))?.props.label).toBe('Review läuft')
+  await danach.unmount()
+  freigeben()
+  await erster
+  await vorher.unmount()
+})
+

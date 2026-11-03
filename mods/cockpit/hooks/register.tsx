@@ -24,11 +24,19 @@ type Dollar = CoreEngineInterface
 // A module variable on purpose (a reload starts it over), and it lapses after SPERRE_MS: a
 // compaction or command that never comes back must not lock the buttons for good.
 const SPERRE_MS = 30_000
-let unterwegs: { art: 'review' | 'compact'; seit: number } | null = null
+// A double click's second press, for the tick-off on the spinner; longer, it would block the
+// way out exactly when an action hangs.
+const DOPPELKLICK_MS = 1_500
+type Sperre = { art: 'review' | 'compact'; seit: number }
+let unterwegs: Sperre | null = null
 /** The action still handing over, or null once none is or the lock has lapsed. */
 const sperre = () => (unterwegs && Date.now() - unterwegs.seit < SPERRE_MS ? unterwegs.art : null)
-const sperren = (art: 'review' | 'compact') => {
-  unterwegs = { art, seit: Date.now() }
+/** Whether a press on this action's spinner is the second press of the click that started it. */
+const doppelklick = (art: Sperre['art']) => unterwegs?.art === art && Date.now() - unterwegs.seit < DOPPELKLICK_MS
+const sperren = (art: Sperre['art']): Sperre => (unterwegs = { art, seit: Date.now() })
+/** Frees the lock only if it is still this action's: a late finally must not free a newer one. */
+const freigeben = (s: Sperre) => {
+  if (unterwegs === s) unterwegs = null
 }
 const schonUnterwegs = (art: 'review' | 'compact') => (art === 'compact' ? 'Es wird schon komprimiert' : 'Das Review wird schon gestartet')
 
@@ -92,11 +100,11 @@ const zurueck = ($: Dollar, alt: Hinweis | null) => update($, hinweis, () => alt
 
 // Review: the order goes out as the person's own prompt, nothing lands in the prompt box.
 // The state flips first so the spinner shows at once, and flips back if the prompt is refused.
-async function reviewSenden($: Dollar, stand: Hinweis, befehl: string) {
+async function reviewSenden($: Dollar, stand: Hinweis, befehl: string, s: Sperre) {
   try {
     await reviewAbschicken($, stand, befehl)
   } finally {
-    unterwegs = null
+    freigeben(s)
   }
 }
 
@@ -116,11 +124,11 @@ async function reviewAbschicken($: Dollar, stand: Hinweis, befehl: string) {
 
 // Compact: straight through the engine, as /compact does. The session.compact hook
 // below shows the spinner and clears the hint once the compaction stands.
-export async function komprimieren($: Dollar, befehl: string | null) {
+export async function komprimieren($: Dollar, befehl: string | null, s?: Sperre) {
   try {
     await verdichten($, befehl)
   } finally {
-    unterwegs = null
+    if (s) freigeben(s)
   }
 }
 
@@ -220,19 +228,18 @@ export const register: Register = on => {
       if (arbeitet) return $.ui.toast('Claude arbeitet noch, danach nochmal')
       const r = sperre()
       if (r) return $.ui.toast(schonUnterwegs(r))
-      sperren('review')
+      const s = sperren('review')
       const jetzt = stand && reviewBefehl ? stand : nachAntwort(null, await letzteAntwort($).catch(() => ''))
       if (!jetzt?.reviewBefehl || jetzt.phase !== 'review') {
-        unterwegs = null
+        freigeben(s)
         return $.ui.toast('Kein Review empfohlen')
       }
-      void reviewSenden($, jetzt, jetzt.reviewBefehl) // not awaited, as with compacting below
+      void reviewSenden($, jetzt, jetzt.reviewBefehl, s) // not awaited, as with compacting below
     }
     // A double click's second press lands here once the row redrew (the spinner keeps the
-    // button's key): while the action still hands over, it is that press, not a tick-off.
+    // button's key): right after the start it is that press, not a tick-off.
     const reviewAbhaken = () => {
-      if (sperre()) return
-      unterwegs = null
+      if (doppelklick('review')) return
       void update($, hinweis, (alt): Hinweis | null => (alt ? { ...alt, phase: 'compact', reviewErledigt: true } : alt)).catch(() => undefined)
       $.ui.toast('Review als erledigt markiert')
     }
@@ -244,16 +251,15 @@ export const register: Register = on => {
       if (arbeitet) return $.ui.toast('Claude arbeitet noch, danach nochmal')
       const r = sperre()
       if (r) return $.ui.toast(schonUnterwegs(r))
-      sperren('compact')
+      const s = sperren('compact')
       const befehl = compactBefehl ?? compactAus(await letzteAntwort($).catch(() => ''))
       // Not awaited: a press has 10 s, a compaction takes longer (2026-11-03 "ui.press hook
       // skipped: ran past its 10s budget"). The engine lets work a press leaves running finish.
-      void komprimieren($, befehl)
+      void komprimieren($, befehl, s)
     }
 
     const compactAbhaken = () => {
-      if (sperre()) return
-      unterwegs = null
+      if (doppelklick('compact')) return
       void update($, komprimiert, () => false).catch(() => undefined)
     }
 
