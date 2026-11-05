@@ -11,6 +11,8 @@ import {
   nachAntwort,
   releaseBefehl,
   reviewAus,
+  schwerlastAusAus,
+  schwerlastUmschalten,
   spracheAus,
   startetRelease,
   startetReview,
@@ -319,4 +321,29 @@ test('a typed or sent release order counts as a release start, in either languag
   expect(startetRelease('Release nach production')).toBe(true)
   expect(startetRelease('When does the release to production come?')).toBe(false)
   expect(startetRelease('Wann kommt der Release nach production?')).toBe(false)
+})
+
+// The heavy-load button rewrites `.claude/sperren.local` (per machine, never tracked): only the
+// "schwerlast" entry and an "aus" line change, other areas and lines stay.
+test('the override file: reading whether the heavy-load lock is off', () => {
+  expect(schwerlastAusAus('')).toBe(false)
+  expect(schwerlastAusAus('ohne: pakete\n')).toBe(false)
+  expect(schwerlastAusAus('ohne: schwerlast\n')).toBe(true)
+  expect(schwerlastAusAus('ohne: pakete, schwerlast')).toBe(true)
+  expect(schwerlastAusAus('aus\n')).toBe(true)
+  expect(schwerlastAusAus('ohne: schwerlast-extra')).toBe(false)
+})
+
+test('the override file: the button switches only schwerlast', () => {
+  expect(schwerlastUmschalten('')).toBe('ohne: schwerlast\n')
+  expect(schwerlastUmschalten('ohne: schwerlast\n')).toBe('')
+  expect(schwerlastUmschalten('ohne: pakete\n')).toBe('ohne: pakete, schwerlast\n')
+  expect(schwerlastUmschalten('ohne: pakete, schwerlast\n')).toBe('ohne: pakete\n')
+  expect(schwerlastUmschalten('# Haupt-PC\nohne: schwerlast\n')).toBe('# Haupt-PC\n')
+  // "aus" switched every area off: the button ends that and keeps the listed areas as they were
+  expect(schwerlastUmschalten('aus\n')).toBe('')
+  expect(schwerlastUmschalten('aus\nohne: pakete\n')).toBe('ohne: pakete\n')
+  // pressing twice returns to the start
+  expect(schwerlastUmschalten(schwerlastUmschalten('ohne: pakete\n'))).toBe('ohne: pakete\n')
+  expect(schwerlastUmschalten('ohne: pakete\r\n')).toBe('ohne: pakete, schwerlast\n')
 })

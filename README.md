@@ -69,6 +69,7 @@ A Claude Code mod that reads the last answer after every turn and highlights the
 | **Compact** | always; highlighted after a compact hint | compacts with the instructions from the last `/compact` line |
 | **Live** | if the repo has `scripts/merge.ps1` | sends *"Release to production"*; the project's `CLAUDE.md` defines what that means |
 | **⚡** | if the repo has `.claude/working-mode` | toggles careful mode and fast mode for all sessions |
+| **🏋** | if the repo has `.claude/hooks/sperren.mjs` | switches the session lock "schwerlast" (type check, full tests: one session at a time) off or on **for this machine only**, by writing the untracked `.claude/sperren.local` itself; highlighted = lock off |
 | **?** | always | explains every visible button below the row |
 
 While a review, compaction or release runs, a spinner stands in for the button; clicking it clears the indicator by hand.

@@ -43,6 +43,10 @@ declare module 'claude-code' {
       modus: 'schnell' | 'sorgfaeltig' | null
       /** Whether the repo has `scripts/merge.ps1`: only then the row shows the Live button. */
       hatRelease: boolean
+      /** Whether the repo has the session-lock hook `.claude/hooks/sperren.mjs`: only then the row shows the heavy-load button. */
+      hatSperren: boolean
+      /** True while this machine's `.claude/sperren.local` switches the heavy-load lock ("schwerlast") off. */
+      schwerlastAus: boolean
       /** True while a release the Live button (or a typed order) started still runs. */
       releaseLaeuft: boolean
       /** Whether the "?" button has the explanations open beneath the row. */

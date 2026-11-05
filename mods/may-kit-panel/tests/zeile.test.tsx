@@ -334,3 +334,42 @@ test('"?" opens the explanations beneath the row and closes them again', async (
   await wieder.unmount()
 })
 
+
+// 2026-11-05: the heavy-load button exists only where the repo has the session-lock hook, and its
+// press writes the machine's `.claude/sperren.local` itself (no prompt goes through the session).
+test('the heavy-load button needs the lock hook and rewrites the override file', async ($, on) => {
+  const geschrieben: Array<{ pfad: string; text: string }> = []
+  const gesendet: string[] = []
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('prompt.submit', (_, e) => {
+    gesendet.push(e.text)
+    return { text: e.text }
+  })
+  on('ui.toast', () => ({ value: undefined }) as never)
+  const pfad = (p: string) => p.split(String.fromCharCode(92)).join('/')
+  let hatHook = false
+  on('fs.exists', (_, e, next) => (pfad(e.path).endsWith('/.claude/hooks/sperren.mjs') ? ({ value: hatHook } as never) : next(e)))
+  on('fs.write', (_, e) => {
+    geschrieben.push({ pfad: pfad(e.path), text: e.text })
+    return { value: undefined } as never
+  })
+  await $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
+  await new Promise(r => setTimeout(r, 20))
+
+  // without the hook: no button
+  let ui = await $.ui.mount({ ...BAND, surface: 'vscode' })
+  expect(await ui.find({ key: 'schwer' })).toBeFalsy()
+  await ui.unmount()
+
+  // with it: the press writes the file and sends no order
+  hatHook = true
+  await $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
+  await new Promise(r => setTimeout(r, 20))
+  ui = await $.ui.mount({ ...BAND, surface: 'vscode' })
+  expect((await ui.find({ key: 'schwer' }))?.props.label).toBe('🏋')
+  await ui.press({ key: 'schwer' })
+  expect(geschrieben.map(g => g.text)).toEqual(['ohne: schwerlast\n'])
+  expect(geschrieben[0]?.pfad.endsWith('/.claude/sperren.local')).toBe(true)
+  expect(gesendet).toEqual([])
+  await ui.unmount()
+})

@@ -27,6 +27,10 @@ const vorher = atom({ plugin: 'may-kit-panel', key: 'vorher' } as const, null)
 const modus = atom({ plugin: 'may-kit-panel', key: 'modus' } as const, null)
 // Whether the repo has the release script, and whether a release the Live button sent still runs.
 const hatRelease = atom({ plugin: 'may-kit-panel', key: 'hatRelease' } as const, false)
+// Whether the repo has the session-lock hook (`.claude/hooks/sperren.mjs`), and whether this machine's
+// override file `.claude/sperren.local` switches its heavy-load lock ("schwerlast") off.
+const hatSperren = atom({ plugin: 'may-kit-panel', key: 'hatSperren' } as const, false)
+const schwerlastAus = atom({ plugin: 'may-kit-panel', key: 'schwerlastAus' } as const, false)
 const releaseLaeuft = atom({ plugin: 'may-kit-panel', key: 'releaseLaeuft' } as const, false)
 // Whether the "?" button has the explanations open beneath the row (VS Code draws no hover).
 const hilfe = atom({ plugin: 'may-kit-panel', key: 'hilfe' } as const, false)
@@ -97,7 +101,14 @@ const DE = {
     blitzAn: 'Schnellmodus an: jede fertige Änderung geht ungefragt und ungeprüft nach Production, für alle Sessions. Klick schaltet aus.',
     blitzAus:
       'Schnellmodus aus (sorgfältig). Klick schaltet ein: dann geht jede fertige Änderung ungefragt und ungeprüft nach Production, für alle Sessions.',
+    schwerAn:
+      'Schwerlast-Sperre aus, nur auf diesem Rechner (.claude/sperren.local): Typprüfung und volle Tests laufen ohne Warten auf andere Sessions. Klick schaltet die Sperre wieder ein.',
+    schwerAus:
+      'Schwerlast-Sperre an: Typprüfung und volle Tests laufen nur eine Session zugleich. Klick schaltet sie auf diesem Rechner aus (.claude/sperren.local), sinnvoll bei viel Arbeitsspeicher.',
   },
+  schwerToastAus: 'Schwerlast-Sperre aus (nur dieser Rechner)',
+  schwerToastAn: 'Schwerlast-Sperre an',
+  schwerNichtGeschrieben: (g: string) => `Schwerlast-Sperre nicht umgestellt: ${g}`,
 }
 
 const EN: typeof DE = {
@@ -150,7 +161,14 @@ const EN: typeof DE = {
     live: 'Sends “Release to production” at once; the project’s CLAUDE.md defines what that means.',
     blitzAn: 'Fast mode on: every finished change goes to production unasked and unchecked, for all sessions. Click switches it off.',
     blitzAus: 'Fast mode off (careful). Click switches it on: every finished change then goes to production unasked and unchecked, for all sessions.',
+    schwerAn:
+      'Heavy-load lock off, on this machine only (.claude/sperren.local): type check and full tests run without waiting for other sessions. Click switches the lock back on.',
+    schwerAus:
+      'Heavy-load lock on: type check and full tests run one session at a time. Click switches it off on this machine (.claude/sperren.local), sensible with plenty of memory.',
   },
+  schwerToastAus: 'Heavy-load lock off (this machine only)',
+  schwerToastAn: 'Heavy-load lock on',
+  schwerNichtGeschrieben: (g: string) => `Heavy-load lock not switched: ${g}`,
 }
 
 const TEXTE: Record<Sprache, typeof DE> = { de: DE, en: EN }
@@ -242,6 +260,27 @@ export const modusAus = (text: string): 'schnell' | 'sorgfaeltig' => (['schnell'
 export const modusBefehl = (jetzt: 'schnell' | 'sorgfaeltig' | null, sprache: Sprache = 'en') =>
   jetzt === 'schnell' ? TEXTE[sprache].modusSorgfaeltig : TEXTE[sprache].modusSchnell
 
+/** The areas listed in the "ohne:" line of a lock switch file (`.claude/sperren` or `.claude/sperren.local`). */
+const ohneListe = (text: string): string[] => ((text.match(/^[ \t]*ohne:[ \t]*(.*)$/im) || [])[1] || '').split(/[\s,]+/).filter(Boolean)
+
+/** Whether the machine's override file switches the heavy-load lock off: first word "aus", or "schwerlast" in its "ohne:" line. */
+export const schwerlastAusAus = (text: string): boolean => /^\s*aus\b/i.test(text) || ohneListe(text).includes('schwerlast')
+
+/**
+ * The override file's text after the heavy-load button was pressed. Only "schwerlast" (and an "aus"
+ * line, which switches every area off) is touched; other areas in "ohne:" and other lines stay.
+ */
+export function schwerlastUmschalten(text: string): string {
+  const warAus = schwerlastAusAus(text)
+  const zeilen = text.split(/\r?\n/).filter(z => !/^\s*aus\b/i.test(z))
+  const liste = ohneListe(zeilen.join('\n')).filter(b => b !== 'schwerlast')
+  if (!warAus) liste.push('schwerlast')
+  const uebrig = zeilen.filter(z => z.trim() !== '' && !/^[ \t]*ohne:/i.test(z))
+  const aus = liste.length > 0 ? [`ohne: ${liste.join(', ')}`] : []
+  const alle = [...uebrig, ...aus]
+  return alle.length > 0 ? `${alle.join('\n')}\n` : ''
+}
+
 /** Whether a submitted prompt starts the review (in either panel language). */
 export const startetReview = (text: string, befehl?: string) =>
   befehl === 'code-review' || /^\s*(?:Review starten|Start review)\b/i.test(text)
@@ -300,6 +339,10 @@ async function umgebungLesen($: Dollar) {
       () => $.fs.read('.claude/arbeitsmodus').then(t => modusAus(String(t)), () => null),
     )
   const r = await $.fs.exists('scripts/merge.ps1').catch(() => false)
+  const hs = await $.fs.exists('.claude/hooks/sperren.mjs').catch(() => false)
+  const sa = await $.fs.read('.claude/sperren.local').then(t => schwerlastAusAus(String(t)), () => false)
+  if ((await read($, hatSperren)) !== hs) await update($, hatSperren, () => hs).catch(() => undefined)
+  if ((await read($, schwerlastAus)) !== sa) await update($, schwerlastAus, () => sa).catch(() => undefined)
   if ((await read($, sprache)) !== sp) await update($, sprache, () => sp).catch(() => undefined)
   if ((await read($, modus)) !== m) await update($, modus, () => m).catch(() => undefined)
   if ((await read($, hatRelease)) !== r) await update($, hatRelease, () => r).catch(() => undefined)
@@ -473,6 +516,8 @@ export async function modellZuruecksetzen($: Dollar, v: Vorher, s?: Sperre, spr:
 // The mode button: the bolt emoji (the person's choice, 2026-11-03). A Button holds only text, so
 // no SVG icon; a bolt-shaped glyph (U+03DF) and a word were tried and dropped.
 const BLITZ = '⚡'
+// The heavy-load button (weightlifter). Highlighted: this machine runs without the lock.
+const SCHWER = '🏋'
 
 // A small turning arc, grey at half strength so it reads on light and dark themes.
 const SPINNER =
@@ -557,6 +602,8 @@ export const register: Register = on => {
     const mitRelease = await read($, hatRelease)
     const laeuftRelease = await read($, releaseLaeuft)
     const schnell = modusJetzt === 'schnell'
+    const mitSperren = await read($, hatSperren)
+    const schwerOhne = await read($, schwerlastAus)
     const hilfeOffen = await read($, hilfe)
     const wahl = await read($, modellwahl)
     const zurueckZu = await read($, vorher)
@@ -658,6 +705,21 @@ export const register: Register = on => {
       void befehlSenden($, modusBefehl(modusJetzt, spr), sperren('modus'), false, spr)
     }
 
+    // Unlike the other buttons nothing goes through the session: the press rewrites this machine's
+    // untracked `.claude/sperren.local` itself; the lock hook reads it afresh with every command.
+    const schwerDruecken = async () => {
+      try {
+        const alt = await $.fs.read('.claude/sperren.local').then(String, () => '')
+        const neu = schwerlastUmschalten(alt)
+        await $.fs.write('.claude/sperren.local', neu)
+        const aus = schwerlastAusAus(neu)
+        await update($, schwerlastAus, () => aus).catch(() => undefined)
+        $.ui.toast(aus ? t.schwerToastAus : t.schwerToastAn)
+      } catch (err) {
+        $.ui.toast(t.schwerNichtGeschrieben(err instanceof Error ? err.message : String(err)))
+      }
+    }
+
     // Hover help: each button sits in a Box of its hover group; the matching text, drawn hidden
     // right of the row, shows while the pointer rests on the button (no hook runs, BoxHoverProps).
     const tipps: Array<[string, string]> = [
@@ -667,6 +729,7 @@ export const register: Register = on => {
       ['compact', laeuftCompact ? t.tipp.compactLaeuft : t.tipp.compact],
       ['live', laeuftRelease ? t.tipp.liveLaeuft : t.tipp.live],
       ['blitz', schnell ? t.tipp.blitzAn : t.tipp.blitzAus],
+      ['schwer', schwerOhne ? t.tipp.schwerAn : t.tipp.schwerAus],
     ]
     // The same texts as a list beneath the row, for the buttons drawn now; "?" opens and closes it.
     const namen: Record<string, string> = {
@@ -676,9 +739,14 @@ export const register: Register = on => {
       compact: t.compact,
       live: t.live,
       blitz: BLITZ,
+      schwer: SCHWER,
     }
     const sichtbar = tipps.filter(
-      ([id]) => (id !== 'live' || mitRelease) && (id !== 'blitz' || modusJetzt !== null) && (id !== 'zurueck' || zurueckZu !== null),
+      ([id]) =>
+        (id !== 'live' || mitRelease) &&
+        (id !== 'blitz' || modusJetzt !== null) &&
+        (id !== 'schwer' || mitSperren) &&
+        (id !== 'zurueck' || zurueckZu !== null),
     )
     const hilfeUmschalten = () => {
       void update($, hilfe, offen => !offen).catch(() => undefined)
@@ -755,6 +823,12 @@ export const register: Register = on => {
               // mode: highlighted is fast mode (every finished change goes to production unasked),
               // dim is careful mode.
               <Button key="blitz" label={BLITZ} variant={schnell ? 'primary' : 'secondary'} dimColor={!schnell} onPress={blitzDruecken} />,
+            )
+          : null}
+        {mitSperren
+          ? mitTipp(
+              'schwer',
+              <Button key="schwer" label={SCHWER} variant={schwerOhne ? 'primary' : 'secondary'} dimColor={!schwerOhne} onPress={schwerDruecken} />,
             )
           : null}
         <Button key="hilfe" label={hilfeOffen ? t.hilfeZu : '?'} variant="secondary" dimColor onPress={hilfeUmschalten} />
