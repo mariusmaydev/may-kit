@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import {
+  antwortDerRunde,
   compactAnweisung,
   compactAus,
   komprimieren,
@@ -74,6 +75,38 @@ test('the review order names exactly the commits, model and effort of the block,
   expect(reviewAus(REVIEW_DE)).toBe(ORDER_EN)
   expect(reviewAus(REVIEW_DE, 'de')).toBe(ORDER_DE)
 })
+
+// 2026-11-08: the Stop hook model-line.mjs blocked the turn after the recommendation, the model
+// added a lone model line, and the Review button read only that line ("no review").
+test('a model line the Stop hook asked for does not hide the review of the same turn', async () => {
+  const MODELLZEILE = '**Model:** Opus xhigh fits, because the design decisions were made during the implementation.'
+  const ru = (role: 'user' | 'assistant', text: string, toolResults?: unknown[]) => ({ role, text, toolResults })
+  const runde = [
+    ru('user', 'Build the new area kind.'),
+    ru('assistant', 'Reading the code first.'),
+    ru('user', '', [{ tool_use_id: 't1', text: 'ok' }]),
+    ru('assistant', REVIEW),
+    ru('user', 'Stop hook feedback:\nmay-kit, CLAUDE.md §3: this turn changed files, but no answer of it carries the model line.'),
+    ru('assistant', MODELLZEILE),
+  ]
+  expect(antwortDerRunde(runde)).toBe(REVIEW)
+  expect(reviewAus(antwortDerRunde(runde))).toBe(ORDER_EN)
+  // the hook's text alone marks it, should the engine word the feedback differently
+  runde[4] = ru('user', 'may-kit, CLAUDE.md §3: this turn changed files, but no answer of it carries the model line.')
+  expect(antwortDerRunde(runde)).toBe(REVIEW)
+  // a review result table after a forced model line still counts as the review's report
+  const bericht = '| Finding | Result |\n|---|---|\n| H1 | fixed |'
+  expect(antwortDerRunde([ru('user', 'Start review'), ru('assistant', bericht), ru('assistant', MODELLZEILE)])).toBe(bericht)
+})
+
+test('a review of an earlier turn is not read again once the person asked something new', async () => {
+  const runde = [ru2('user', 'Build it.'), ru2('assistant', REVIEW), ru2('user', 'And now the colours?'), ru2('assistant', 'The colours are done.')]
+  expect(antwortDerRunde(runde)).toBe('The colours are done.')
+  // a turn without any text falls back to the answer before it, as before
+  expect(antwortDerRunde([ru2('user', 'Build it.'), ru2('assistant', 'Done.'), ru2('user', 'Go on.'), ru2('assistant', '')])).toBe('Done.')
+  expect(antwortDerRunde([])).toBe('')
+})
+const ru2 = (role: 'user' | 'assistant', text: string) => ({ role, text })
 
 test('a review without commits gives no order (it would review other sessions)', async () => {
   expect(reviewAus(REVIEW.replace(' 3f2a1b9 7c0d4e2', ''))).toBe(null)

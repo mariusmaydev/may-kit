@@ -373,14 +373,46 @@ async function agentenLaufen($: Dollar): Promise<boolean> {
   return agenten.some(a => a.parentId === undefined && (a.status === 'pending' || a.status === 'running' || a.status === 'waiting'))
 }
 
-async function letzteAntwort($: Dollar): Promise<string> {
-  const msgs = await $.session.messages()
-  if (!Array.isArray(msgs)) return ''
-  for (let i = msgs.length - 1; i >= 0; i--) {
+/** Whether an answer carries something the row acts on: a review recommendation, a compact or switch hint, a review's result table. */
+const traegtHinweis = (text: string) =>
+  /REVIEW RECOMMENDATION|REVIEW-EMPFEHLUNG|Compact now|Jetzt komprimieren|\*\*(?:Weiter|Next):\*\*/.test(text) || meldetReview(text)
+
+/** Feedback of a blocking Stop hook (such as hooks/model-line.mjs), handed to the model as a user message: part of the turn, no prompt. */
+const istHookRueckmeldung = (text: string) => /^\s*Stop hook feedback:|may-kit, CLAUDE\.md §3:/.test(text)
+
+/**
+ * The answer the row reads: within the last turn the newest assistant message that carries a hint,
+ * else the turn's newest text; a turn without any text falls back to the newest text before it.
+ * The turn reaches back to the person's last prompt; tool results and hook feedback lie inside it.
+ * 2026-11-08: the Stop hook model-line.mjs made the model add a lone "**Model:**" line after the
+ * REVIEW RECOMMENDATION. Read alone, that last message hid the recommendation, and the Review
+ * button had nothing to send.
+ */
+export function antwortDerRunde(msgs: readonly { role: string; text: string; toolResults?: readonly unknown[] }[]): string {
+  let i = msgs.length - 1
+  let neueste = ''
+  for (; i >= 0; i--) {
+    const m = msgs[i]
+    if (!m) continue
+    if (m.role === 'user') {
+      if (m.toolResults?.length || !m.text.trim() || istHookRueckmeldung(m.text)) continue
+      break
+    }
+    if (m.role !== 'assistant' || !m.text.trim()) continue
+    if (traegtHinweis(m.text)) return m.text
+    if (!neueste) neueste = m.text
+  }
+  if (neueste) return neueste
+  for (; i >= 0; i--) {
     const m = msgs[i]
     if (m && m.role === 'assistant' && m.text.trim()) return m.text
   }
   return ''
+}
+
+async function letzteAntwort($: Dollar): Promise<string> {
+  const msgs = await $.session.messages()
+  return Array.isArray(msgs) ? antwortDerRunde(msgs) : ''
 }
 
 const zurueck = ($: Dollar, alt: Hinweis | null) => update($, hinweis, () => alt).catch(() => undefined)
