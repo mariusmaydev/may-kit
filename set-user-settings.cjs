@@ -5,6 +5,8 @@
 //     answers in that language, and the may-kit panel follows it.
 //   - env.CLAUDE_CODE_PLUGIN_DIRS gains <plugin dir> (each mod folder, separated by ";" on
 //     Windows, ":" elsewhere), so every new session loads the repo's mods.
+//   - hooks.Stop gains hooks/model-line.mjs, which asks for the model line of CLAUDE.md §3 when a
+//     turn changed files without it.
 // Called by install.ps1:
 //   node set-user-settings.cjs <settings.json> <backup stamp> <style> <plugin dir> [<plugin dir> …]
 // The system language comes from MAY_KIT_LOCALE (install.ps1 passes the Windows display language),
@@ -70,6 +72,22 @@ for (const dir of dirs) {
 }
 if (current.length) cfg.env.CLAUDE_CODE_PLUGIN_DIRS = current.join(sep);
 else delete cfg.env.CLAUDE_CODE_PLUGIN_DIRS;
+
+// Stop hook hooks/model-line.mjs (CLAUDE.md §3): one entry, pointing at this repo. An entry left
+// by an earlier location of the repo is replaced; other Stop hooks stay untouched.
+const hookCmd = `node "${path.join(__dirname, "hooks", "model-line.mjs").replace(/\\/g, "/")}"`;
+const isOurs = (h) => /model-line\.mjs/.test(String(h.command || ""));
+cfg.hooks = cfg.hooks || {};
+const stop = cfg.hooks.Stop || [];
+if (stop.some((g) => (g.hooks || []).some((h) => h.command === hookCmd))) report.push("ok        hook Stop model-line");
+else {
+  const rest = stop
+    .map((g) => ({ ...g, hooks: (g.hooks || []).filter((h) => !isOurs(h)) }))
+    .filter((g) => g.hooks.length);
+  rest.push({ hooks: [{ type: "command", command: hookCmd, timeout: 10 }] });
+  cfg.hooks.Stop = rest;
+  report.push("added     hook Stop model-line");
+}
 
 // Compare content, not formatting: an unchanged file is never rewritten.
 if (JSON.stringify(JSON.parse(before || "{}")) !== JSON.stringify(cfg)) {

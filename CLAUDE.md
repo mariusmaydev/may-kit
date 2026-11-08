@@ -53,7 +53,7 @@ The **last line of the plan** is the model line from §3 — so it already stand
 
 ## 3. Model recommendation
 
-**When:** before **every implementation** — before the first change to code, configuration or docs, regardless of whether a planning phase ran (§1). Excepted is only what §1 lists as "no planning phase", except "carrying out an approved plan": there the line stands right then. Even "just do it" does not lift it; it costs a line, not a round.
+**When:** in **every turn that changes files** — before the first change to code, configuration or docs, regardless of whether a planning phase ran (§1) and however small the change is. Excepted are only turns without a change (research, questions) and edits to memory, plan or scratchpad files. Even "just do it" does not lift it; it costs a line, not a round. The Stop hook `hooks/model-line.mjs` asks for the line once when a turn changed files without it.
 
 **The model stays** — exactly one line, then keep working:
 
@@ -146,7 +146,7 @@ OPUS ESCALATION RECOMMENDED
 
 ## 5. Review after implementation
 
-Only after tests and verification have passed. **Working mode `fast`** (project file `.claude/working-mode`; older projects keep `.claude/arbeitsmodus` with the word `schnell`): there the duties of this section and those from specs lapse, except database tests for migrations; results then read "not checked". **Evidence before claims:** actually run the check commands and read the output before "done", "fixed" or "green" is said.
+Only after tests and verification have passed. **Working mode `fast`** (project file `.claude/working-mode`; older projects keep `.claude/arbeitsmodus` with the word `schnell`): there the check duties of this section and those from specs lapse (tests, verification, also in step 3 of the review procedure), except database tests for migrations; results then read "not checked". **The review recommendation stays in mode `fast`:** same criteria and timing, it just comes after the stage's commit instead of after green checks. **Evidence before claims:** actually run the check commands and read the output before "done", "fixed" or "green" is said.
 
 **Timing:** A recommendation comes only when no open question and no missing part can change the stage's code any more. What may stay open without postponing the review: device test, browser test, runtime measurement, points of a later stage. If a question is pending whose answer can change the code, the question comes first, the review recommendation only after the answer has been implemented.
 
