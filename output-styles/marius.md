@@ -69,7 +69,7 @@ Sparingly. A link with a line number only when it proves something or the user s
 
 > **Model:** Opus xhigh fits, because the cause is not yet evidenced.
 
-This line is not a preamble and is not covered by "Leave out".
+This line is not a preamble and is not covered by "Leave out". It is also the right line when the recommended model and effort are already selected: then no `**Next:**`, no waiting — the work goes on in the same answer.
 
 **Model switch and compaction** — one sentence plus a ready-to-copy command, no block; the answer ends with it, implementation starts only afterwards. The spelling `/model` → <model>, Effort <level> stays exactly so, the "Model + Effort" button of the mod reads it:
 

@@ -74,7 +74,9 @@ Plan: <path> [· then Opus review]
 
 Required content: model, effort, reason; plan file as soon as one has been written (§2); "then Opus review" if §5 already points to "Yes". The spelling `/model` → <model>, Effort <level> is fixed: the mod reads exactly it.
 
-**Plan mode:** The plan ends with the model line (§2). If it says "**Next:**", approval does **not** start the implementation: write the plan file, output the hint, end the answer.
+**Compare before you recommend:** Check the recommended model and effort against what is running — the model named in the system prompt, and the effort the session reports (otherwise `effortLevel` in `~/.claude/settings.json`; if neither says, the model alone decides). If both match, it is the "stays" case: write the `**Model:**` line and carry on in the same turn — no `**Next:**`, no waiting for the user. `**Next:**` only when model or effort actually differ.
+
+**Plan mode:** The plan ends with the model line (§2). If it says "**Next:**", approval does **not** start the implementation: write the plan file, output the hint, end the answer. If it says "**Model:**" because the recommended model and effort are already running, approval starts the implementation directly.
 
 **Don't omit it:** The line is never silently missing. A missing hint looks like a forgotten one; that is why "fits" is also stated explicitly. The current model counts as right only with a named criterion — "I'm already here" is none.
 
