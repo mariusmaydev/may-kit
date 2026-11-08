@@ -109,8 +109,8 @@ const DE = {
   schwerToastAus: 'Schwerlast-Sperre aus (nur dieser Rechner)',
   schwerToastAn: 'Schwerlast-Sperre an',
   schwerNichtGeschrieben: (g: string) => `Schwerlast-Sperre nicht umgestellt: ${g}`,
-  updateFertig: (n: number, betreff: string) => `may-kit aktualisiert (${n} ${n === 1 ? 'Commit' : 'Commits'}): ${betreff}. Wirkt in neuen Chats.`,
-  updateInstallerSelbst: ' Installer bitte selbst laufen lassen (INSTALL.md).',
+  updateFertig: (n: number, betreff: string) => `may-kit aktualisiert (${n} ${n === 1 ? 'Commit' : 'Commits'}): ${betreff}. Neue Chats nutzen es.`,
+  updateInstallerSelbst: 'may-kit wurde geändert: Installer bitte selbst laufen lassen (INSTALL.md).',
   updateInstallerFehler: (g: string) => `may-kit gezogen, der Installer meldet: ${g}`,
   updateWartet: (grund: string) => `may-kit-Update wartet: ${grund}`,
   updateGrund: {
@@ -119,7 +119,7 @@ const DE = {
     voraus: 'eigene Commits im Klon, noch nicht gepusht',
     pull: (g: string) => `git pull fehlgeschlagen (${g})`,
   },
-  hilfeUpdate: 'Updates: Das Panel prüft einmal am Tag auf GitHub und installiert neue Versionen selbst. Sie wirken in neuen Chats.',
+  hilfeUpdate: 'Updates: Das Panel prüft einmal am Tag auf GitHub und installiert neue Versionen selbst. Neue Chats nutzen sie.',
 }
 
 const EN: typeof DE = {
@@ -180,8 +180,8 @@ const EN: typeof DE = {
   schwerToastAus: 'Heavy-load lock off (this machine only)',
   schwerToastAn: 'Heavy-load lock on',
   schwerNichtGeschrieben: (g: string) => `Heavy-load lock not switched: ${g}`,
-  updateFertig: (n: number, betreff: string) => `may-kit updated (${n} ${n === 1 ? 'commit' : 'commits'}): ${betreff}. Takes effect in new chats.`,
-  updateInstallerSelbst: ' Please run the installer yourself (INSTALL.md).',
+  updateFertig: (n: number, betreff: string) => `may-kit updated (${n} ${n === 1 ? 'commit' : 'commits'}): ${betreff}. New chats use it.`,
+  updateInstallerSelbst: 'may-kit changed: please run the installer yourself (INSTALL.md).',
   updateInstallerFehler: (g: string) => `may-kit pulled, the installer reports: ${g}`,
   updateWartet: (grund: string) => `may-kit update waiting: ${grund}`,
   updateGrund: {
@@ -190,7 +190,7 @@ const EN: typeof DE = {
     voraus: 'commits of its own in the clone, not pushed yet',
     pull: (g: string) => `git pull failed (${g})`,
   },
-  hilfeUpdate: 'Updates: once a day the panel checks GitHub and installs new versions by itself. They take effect in new chats.',
+  hilfeUpdate: 'Updates: once a day the panel checks GitHub and installs new versions by itself. New chats use them.',
 }
 
 const TEXTE: Record<Sprache, typeof DE> = { de: DE, en: EN }
@@ -544,6 +544,28 @@ export function nachBefehl(basis: Vorher | null, befehl: 'model' | 'effort', arg
   return /^(?:low|medium|high|xhigh|max)$/.test(wert) ? { ...basis, effort: wert } : basis
 }
 
+// Built-in commands that run locally and start no model turn: they get no prompt line.
+const LOKALE_BEFEHLE = new Set([
+  'add-dir', 'agents', 'clear', 'compact', 'config', 'context', 'cost', 'doctor', 'effort', 'exit', 'export', 'fast',
+  'help', 'hooks', 'ide', 'login', 'logout', 'mcp', 'memory', 'model', 'permissions', 'plugin', 'plugins', 'quit',
+  'resume', 'rewind', 'status', 'statusline', 'theme', 'usage', 'vim',
+])
+
+/**
+ * Model and effort for the prompt line. The model live, as /model shows it: the VS Code dropdown,
+ * /model without arguments or a fallback model leave `zuletzt` behind, and a line naming a model the
+ * system prompt contradicts would cause exactly the wrong stop it exists to prevent. The effort from
+ * the last request while that ran on the same model, else the setting.
+ */
+async function laufendLesen($: Dollar): Promise<Vorher | null> {
+  const live = await $.session.model().catch(() => '')
+  const modell = /opus|sonnet|haiku|fable/i.test(live) ? live : (zuletzt?.modell ?? live)
+  if (!modell) return null
+  const gleich = zuletzt !== null && modellKurz(zuletzt.modell) === modellKurz(modell)
+  const effort = (gleich ? zuletzt?.effort : null) ?? (await $.settings.read({ key: 'effortLevel' }).then(w => (typeof w === 'string' ? w : null), () => null))
+  return { modell, effort }
+}
+
 /**
  * The line the panel puts beside each prompt, unseen by the person (CLAUDE.md §3 "Compare before you
  * recommend"): the system prompt names the model, but nothing names the effort, and a guessed one made
@@ -640,41 +662,74 @@ export function updateEntscheidung(l: UpdateLage): 'aktuell' | 'ziehen' | Update
   return 'ziehen'
 }
 
-/** Whether the pulled files need the installer again: its own two files, or a new mod's manifest. */
-export const brauchtInstaller = (dateien: string) =>
-  /^(?:install\.ps1|set-user-settings\.cjs|mods\/[^/\n]+\/\.claude-plugin\/plugin\.json)$/m.test(dateien)
+/**
+ * The line of a git or installer error worth a toast: git's "fatal:"/"error:" line (hints come before
+ * it), else the first line — a PowerShell `throw` puts its message first and its "+ …" noise after.
+ */
+export function meldung(text: string): string {
+  const zeilen = text.split(/\r?\n/).map(z => z.trim()).filter(Boolean)
+  return zeilen.find(z => /^(?:fatal|error):/i.test(z)) ?? zeilen[0] ?? ''
+}
 
-const letzteZeile = (s: string) => s.trim().split(/\r?\n/).pop()?.trim() ?? ''
+// Git never asks: a background session must not open a login window or wait on a console prompt.
+const GIT_ENV = { GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never' }
+
+type Lauf = (argv: string[], timeoutMs?: number) => Promise<{ exitCode: number; stdout: string; stderr: string }>
+
+/** Runs a command; a start failure or a timeout reads as exit -1 with its message, never as a rejection. */
+const laeufer = ($: Dollar): Lauf => (argv, timeoutMs = 30_000) =>
+  $.process
+    .run(argv, { timeoutMs, env: GIT_ENV })
+    .catch((e: unknown) => ({ exitCode: -1, stdout: '', stderr: e instanceof Error ? e.message : String(e) }))
+
+const pfad = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
 
 /**
- * The daily update; `jetzt` and `pause` are parameters for the tests. Resolves to what happened (the
- * tests read it; the person sees only the toast). A failure of its own never reaches the session.
+ * The may-kit clone the panel was loaded from, or null. Only a repo that holds the plugin under
+ * `mods/` and tracks the installer counts: a copy of the mod inside another repo (dotfiles, a vendored
+ * folder) must never be pulled, nor its install.ps1 run.
  */
-export async function aktualisieren($: Dollar, spr: Sprache = 'en', jetzt = Date.now(), pause = 2000): Promise<string> {
+export async function kitFinden($: Dollar, lauf: Lauf = laeufer($)): Promise<string | null> {
+  const top = await lauf(['git', '-C', $.plugin.root, 'rev-parse', '--show-toplevel'])
+  if (top.exitCode !== 0) return null
+  const repo = top.stdout.trim()
+  if (!repo || !pfad($.plugin.root).startsWith(`${pfad(repo)}/mods/`)) return null
+  const kit = await lauf(['git', '-C', repo, 'ls-files', '--error-unmatch', 'install.ps1', 'set-user-settings.cjs'])
+  return kit.exitCode === 0 ? repo : null
+}
+
+/** Claims `key` for this session: write, wait, read back; false when another session wrote last. */
+async function beanspruchen($: Dollar, key: string, wert: Record<string, unknown>, pause: number): Promise<boolean> {
+  const ich = { ...wert, von: `${await $.session.id().catch(() => '')}-${Math.random()}` }
+  await $.store.set(key, ich)
+  if (pause > 0) await $.clock.sleep(pause)
+  const stand = (await $.store.get(key).catch(() => undefined)) as { von?: unknown } | undefined
+  return stand?.von === ich.von
+}
+
+/**
+ * The daily network part: fetch, and fast-forward a clean `main` with nothing of its own ahead.
+ * `jetzt` and `pause` are parameters for the tests; resolves to what happened (the person sees only
+ * the toast). One fetch, then `merge --ff-only @{u}`: no second contact with the remote, so count and
+ * subject in the toast are what came in, and the person's pull.rebase setting plays no part.
+ */
+export async function aktualisieren($: Dollar, repo: string, spr: Sprache = 'en', jetzt = Date.now(), pause = 2000, lauf: Lauf = laeufer($)): Promise<string> {
   const t = TEXTE[spr]
   if (!updateFaellig(await $.store.get(UPDATE_KEY).catch(() => undefined), jetzt)) return 'nicht-faellig'
-  // Claim the check, wait, look again: of sessions starting together only the last writer goes on.
-  // Claimed before git runs: offline, the next try comes the next day, not with every turn.
-  const ich = { at: jetzt, von: `${await $.session.id().catch(() => '')}-${Math.random()}` }
-  await $.store.set(UPDATE_KEY, ich)
-  if (pause > 0) await $.clock.sleep(pause)
-  const stand = (await $.store.get(UPDATE_KEY).catch(() => undefined)) as { von?: unknown } | undefined
-  if (stand?.von !== ich.von) return 'andere-session'
-
-  const lauf = (argv: string[], timeoutMs = 30_000) =>
-    $.process.run(argv, { timeoutMs }).catch((e: unknown) => ({ exitCode: -1, stdout: '', stderr: e instanceof Error ? e.message : String(e) }))
-  const top = await lauf(['git', '-C', $.plugin.root, 'rev-parse', '--show-toplevel'])
-  if (top.exitCode !== 0) return 'kein-repo'
-  const repo = top.stdout.trim()
+  // Claimed before git runs: offline, the next try comes the next day, not with every turn. The store
+  // gives no promise across processes; two sessions that both go on are harmless (see the merge).
+  if (!(await beanspruchen($, UPDATE_KEY, { at: jetzt }, pause))) return 'andere-session'
   const git = (args: string[], timeoutMs?: number) => lauf(['git', '-C', repo, ...args], timeoutMs)
 
   if ((await git(['fetch', '--quiet', 'origin'], 60_000)).exitCode !== 0) return 'offline'
   const zaehlung = await git(['rev-list', '--left-right', '--count', 'HEAD...@{u}'])
-  if (zaehlung.exitCode !== 0) return 'kein-upstream'
-  const [voraus = 0, zurueck = 0] = zaehlung.stdout.trim().split(/\s+/).map(Number)
-  const branch = (await git(['rev-parse', '--abbrev-ref', 'HEAD'])).stdout.trim()
-  const sauber = (await git(['status', '--porcelain', '--untracked-files=no'])).stdout.trim() === ''
-  const was = updateEntscheidung({ branch, sauber, voraus, zurueck })
+  const [voraus, zurueck] = zaehlung.stdout.trim().split(/\s+/).map(Number)
+  if (zaehlung.exitCode !== 0 || !Number.isInteger(voraus) || !Number.isInteger(zurueck)) return 'kein-upstream'
+  const kopf = await git(['rev-parse', '--abbrev-ref', 'HEAD'])
+  const status = await git(['status', '--porcelain', '--untracked-files=no'])
+  if (kopf.exitCode !== 0 || status.exitCode !== 0) return 'kein-upstream'
+  const branch = kopf.stdout.trim()
+  const was = updateEntscheidung({ branch, sauber: status.stdout.trim() === '', voraus: voraus!, zurueck: zurueck! })
   if (was === 'aktuell') return 'aktuell'
   if (was !== 'ziehen') {
     const g = t.updateGrund
@@ -683,26 +738,63 @@ export async function aktualisieren($: Dollar, spr: Sprache = 'en', jetzt = Date
   }
 
   const betreff = (await git(['log', '-1', '--format=%s', '@{u}'])).stdout.trim()
-  const dateien = (await git(['diff', '--name-only', 'HEAD', '@{u}'])).stdout
-  const pull = await git(['pull', '--ff-only', '--quiet'], 120_000)
-  if (pull.exitCode !== 0) {
-    $.ui.toast(t.updateWartet(t.updateGrund.pull(letzteZeile(pull.stderr || pull.stdout))))
+  const merge = await git(['merge', '--ff-only', '--quiet', '@{u}'], 120_000)
+  if (merge.exitCode !== 0) {
+    // a second session merging at the same moment holds the index: it does the update
+    if (/index\.lock/.test(merge.stderr)) return 'andere-session'
+    $.ui.toast(t.updateWartet(t.updateGrund.pull(meldung(merge.stderr || merge.stdout))))
     return 'pull-fehler'
   }
-  let nachsatz = ''
-  if (brauchtInstaller(dateien)) {
-    // Windows: install.ps1 as INSTALL.md says. Elsewhere the installer needs paths the panel does not
-    // know (settings file, mod list): the toast asks for it.
-    if (/^[A-Za-z]:[\\/]/.test(repo)) {
-      const inst = await lauf(['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', `${repo}/install.ps1`], 120_000)
-      if (inst.exitCode !== 0) {
-        $.ui.toast(t.updateInstallerFehler(letzteZeile(inst.stderr || inst.stdout)))
-        return 'installer-fehler'
-      }
-    } else nachsatz = t.updateInstallerSelbst
-  }
-  $.ui.toast(t.updateFertig(zurueck, betreff) + nachsatz)
+  // At once after the merge: where the mod folder is watched, the new files reload this module about a
+  // quarter second later, and what still awaits here may not run. The installer is no part of this:
+  // installerPruefen catches it, after a reload in its session.start.
+  $.ui.toast(t.updateFertig(zurueck!, betreff))
   return 'aktualisiert'
+}
+
+const INSTALL_KEY = 'installiert'
+
+/**
+ * Runs the installer whenever the clone's installer state differs from the last successful run: the
+ * blobs of install.ps1 and set-user-settings.cjs plus the list of mods. State, not the diff of one
+ * pull: a failed or interrupted run, a reload, or a pull by hand is caught at the next session start.
+ * Local git only, no network. A failed run is retried at most once a day; elsewhere than Windows the
+ * installer needs paths the panel does not know, so a toast asks for it, once per state.
+ */
+export async function installerPruefen($: Dollar, repo: string, spr: Sprache = 'en', jetzt = Date.now(), pause = 2000, lauf: Lauf = laeufer($)): Promise<string> {
+  const t = TEXTE[spr]
+  const git = (args: string[]) => lauf(['git', '-C', repo, ...args])
+  const blobs = await git(['rev-parse', 'HEAD:install.ps1', 'HEAD:set-user-settings.cjs'])
+  const mods = await git(['ls-tree', '-d', '--name-only', 'HEAD', 'mods/'])
+  if (blobs.exitCode !== 0 || mods.exitCode !== 0) return 'unlesbar'
+  const stand = `${blobs.stdout.trim()}\n${mods.stdout.trim()}`.replace(/\r/g, '')
+  const alt = (await $.store.get(INSTALL_KEY).catch(() => undefined)) as { stand?: unknown; ok?: unknown; at?: unknown } | undefined
+  if (alt?.stand === stand && (alt.ok === true || (typeof alt.at === 'number' && jetzt - alt.at < UPDATE_ABSTAND_MS))) return 'aktuell'
+  if (!(await beanspruchen($, INSTALL_KEY, { stand, ok: false, at: jetzt }, pause))) return 'andere-session'
+  if (!/^[A-Za-z]:[\\/]/.test(repo)) {
+    $.ui.toast(t.updateInstallerSelbst)
+    await $.store.set(INSTALL_KEY, { stand, ok: true, at: jetzt })
+    return 'selbst'
+  }
+  const inst = await lauf(['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', `${repo}/install.ps1`], 120_000)
+  if (inst.exitCode !== 0) {
+    $.ui.toast(t.updateInstallerFehler(meldung(inst.stderr || inst.stdout)))
+    return 'installer-fehler'
+  }
+  await $.store.set(INSTALL_KEY, { stand, ok: true, at: jetzt })
+  return 'installiert'
+}
+
+/**
+ * The upkeep: the daily update, then (at session start, or right after an update) the installer
+ * check. After a turn only the daily update is asked, one store read when nothing is due.
+ */
+async function pflegen($: Dollar, spr: Sprache, sitzungsstart: boolean) {
+  if (!sitzungsstart && !updateFaellig(await $.store.get(UPDATE_KEY).catch(() => undefined), Date.now())) return
+  const repo = await kitFinden($)
+  if (!repo) return
+  const r = await aktualisieren($, repo, spr)
+  if (sitzungsstart || r === 'aktualisiert') await installerPruefen($, repo, spr)
 }
 
 export const register: Register = on => {
@@ -710,7 +802,7 @@ export const register: Register = on => {
     const r = await next(e)
     void umgebungLesen($)
       .catch(() => undefined)
-      .then(async () => aktualisieren($, await read($, sprache)))
+      .then(async () => pflegen($, await read($, sprache), true))
       .catch(() => undefined)
     return r
   })
@@ -733,10 +825,10 @@ export const register: Register = on => {
       const basis = zuletzt ?? (await aktuellLesen($))
       zuletzt = nachBefehl(basis, befehl, e.command?.args ?? '') ?? zuletzt
     }
-    // A slash command or the engine's own message (a notification) gets no line: no turn of the
-    // person's begins with it.
-    if (befehl || e.isMeta) return next(e)
-    const zeile = kontextZeile(await aktuellLesen($).catch(() => null))
+    // The engine's own message (a notification) and a local built-in command get no line: no model
+    // turn of the person's begins with them. Skills and prompt commands (/code-review, …) do.
+    if ((befehl && LOKALE_BEFEHLE.has(befehl)) || e.isMeta) return next(e)
+    const zeile = kontextZeile(await laufendLesen($).catch(() => null))
     return next({ ...e, context: [...(e.context ?? []), zeile] })
   })
 
@@ -747,7 +839,7 @@ export const register: Register = on => {
         await umgebungLesen($).catch(() => undefined)
         const spr = await read($, sprache)
         // the daily update: one store read when nothing is due; not awaited, git may take a while
-        void aktualisieren($, spr).catch(() => undefined)
+        void pflegen($, spr, false).catch(() => undefined)
         const alt = await read($, hinweis)
         const laufen = await agentenLaufen($)
         const antwort = await letzteAntwort($)

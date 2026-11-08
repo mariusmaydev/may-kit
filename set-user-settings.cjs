@@ -75,12 +75,16 @@ else delete cfg.env.CLAUDE_CODE_PLUGIN_DIRS;
 // The Stop hook hooks/model-line.mjs (2026-11-08, same day removed): it blocked a turn without the
 // model line and cost a whole extra request each time. An entry an earlier install left is taken
 // out; other Stop hooks stay untouched, an emptied Stop list goes.
-const isOurs = (h) => /model-line\.mjs/.test(String(h.command || ""));
+const isOurs = (h) => /[\\/]hooks[\\/]model-line\.mjs\b/.test(String(h?.command || ""));
+const ownsOne = (g) => Array.isArray(g?.hooks) && g.hooks.some(isOurs);
 const stop = cfg.hooks?.Stop;
-if (Array.isArray(stop) && stop.some((g) => (g.hooks || []).some(isOurs))) {
-  const rest = stop
-    .map((g) => ({ ...g, hooks: (g.hooks || []).filter((h) => !isOurs(h)) }))
-    .filter((g) => g.hooks.length);
+if (Array.isArray(stop) && stop.some(ownsOne)) {
+  // Only a group that held our entry and is empty without it goes; every other group stays as it was.
+  const rest = stop.flatMap((g) => {
+    if (!ownsOne(g)) return [g];
+    const others = g.hooks.filter((h) => !isOurs(h));
+    return others.length ? [{ ...g, hooks: others }] : [];
+  });
   if (rest.length) cfg.hooks.Stop = rest;
   else delete cfg.hooks.Stop;
   if (!Object.keys(cfg.hooks).length) delete cfg.hooks;

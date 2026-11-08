@@ -74,7 +74,7 @@ Plan: <path> [· then Opus review]
 
 Required content: model, effort, reason; plan file as soon as one has been written (§2); "then Opus review" if §5 already points to "Yes". The spelling `/model` → <model>, Effort <level> is fixed: the mod reads exactly it.
 
-**Compare before you recommend:** Check the recommended model against what is running — named in the system prompt and in the line `may-kit: running <model> <effort>` the panel puts beside each prompt. Same model is the "stays" case, even when only the effort differs: write the `**Model:**` line (with the effort you would pick) and carry on in the same turn — no `**Next:**`, no waiting for the user. `**Next:**` only when the model differs.
+**Compare before you recommend:** Check the recommended model against what is running — named in the system prompt and in the line `may-kit: running <model> <effort>` the panel puts beside each prompt. Same model is the "stays" case, even when only the effort differs: write the `**Model:**` line and carry on in the same turn — no `**Next:**`, no waiting for the user. If the effort you would pick differs from the running one, the line says so with the command, so the user can raise it for the next turn: `**Model:** Opus fits (xhigh would be better: /effort xhigh), because …`. `**Next:**` only when the model differs.
 
 **Plan mode:** The plan ends with the model line (§2). If it says "**Next:**", approval does **not** start the implementation: write the plan file, output the hint, end the answer. If it says "**Model:**" because the recommended model is already running, approval starts the implementation directly.
 
@@ -198,4 +198,4 @@ The MCP server `chrome-devtools` (user scope, `~/.claude.json`) hangs on **one**
 
 ---
 
-*Created 2026-09-03, tightened 2026-11-02, §3a compaction 2026-11-03, §3 model line before every implementation 2026-11-03, English with language-neutral markers 2026-11-03.*
+*Created 2026-09-03, tightened 2026-11-02, §3a compaction 2026-11-03, §3 model line before every implementation 2026-11-03, English with language-neutral markers 2026-11-03, §3 same model stays, effort from the panel's prompt line, Stop hook removed 2026-11-08.*

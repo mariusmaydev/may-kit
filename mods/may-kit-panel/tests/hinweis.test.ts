@@ -3,10 +3,12 @@ import { expect, test } from 'claude-code/testing'
 import {
   aktualisieren,
   antwortDerRunde,
-  brauchtInstaller,
   compactAnweisung,
   compactAus,
+  installerPruefen,
+  kitFinden,
   kontextZeile,
+  meldung,
   komprimieren,
   modellAus,
   nachBefehl,
@@ -424,118 +426,171 @@ test('only a clean main with nothing of its own ahead is pulled', () => {
   expect(updateEntscheidung({ ...lage, branch: 'feature' })).toEqual({ grund: 'branch' })
   expect(updateEntscheidung({ ...lage, sauber: false })).toEqual({ grund: 'aenderungen' })
   expect(updateEntscheidung({ ...lage, voraus: 1 })).toEqual({ grund: 'voraus' })
-  expect(brauchtInstaller('CLAUDE.md\nmods/may-kit-panel/hooks/register.tsx\n')).toBe(false)
-  expect(brauchtInstaller('README.md\nset-user-settings.cjs\n')).toBe(true)
-  expect(brauchtInstaller('install.ps1\n')).toBe(true)
-  expect(brauchtInstaller('mods/neu/.claude-plugin/plugin.json\n')).toBe(true)
+})
+
+test('an error toast shows git\'s fatal line or the message a PowerShell throw puts first', () => {
+  expect(meldung('hint: Diverging branches can\'t be fast-forwarded\nfatal: Not possible to fast-forward, aborting.\n')).toBe(
+    'fatal: Not possible to fast-forward, aborting.',
+  )
+  expect(meldung('Could not read settings.json\nIn C:\\kit\\install.ps1:70 Zeichen:5\n+ throw "x"\n    + FullyQualifiedErrorId : x\n')).toBe(
+    'Could not read settings.json',
+  )
+  expect(meldung('')).toBe('')
 })
 
 type Antwort = { exitCode: number; stdout?: string; stderr?: string }
 const JETZT = 1_800_000_000_000
 const GIT: Record<string, Antwort> = {
   'git rev-parse --show-toplevel': { exitCode: 0, stdout: 'C:/kit\n' },
+  'git ls-files': { exitCode: 0, stdout: 'install.ps1\nset-user-settings.cjs\n' },
   'git fetch': { exitCode: 0 },
   'git rev-list': { exitCode: 0, stdout: '0\t2\n' },
   'git rev-parse --abbrev-ref': { exitCode: 0, stdout: 'main\n' },
   'git status': { exitCode: 0, stdout: '' },
   'git log': { exitCode: 0, stdout: 'feat: neu\n' },
-  'git diff': { exitCode: 0, stdout: 'CLAUDE.md\n' },
-  'git pull': { exitCode: 0 },
+  'git merge': { exitCode: 0 },
+  'git rev-parse HEAD:install.ps1': { exitCode: 0, stdout: 'aaa\r\nbbb\n' },
+  'git ls-tree': { exitCode: 0, stdout: 'mods/may-kit-panel\n' },
+  'powershell.exe': { exitCode: 0 },
 }
 
-/** A `$` with store, clock, process and toast in memory; `fremd`: another session claims during the pause. */
-function updateAttrappe(abweichend: Record<string, Antwort> = {}, opts: { store?: unknown; fremd?: boolean } = {}) {
+/**
+ * A `$` with store, clock, process and toast in memory. `fremd`: another session claims the key during
+ * the pause; `wurf`: process.run rejects (a start failure or a timeout).
+ */
+function updateAttrappe(abweichend: Record<string, Antwort> = {}, opts: { store?: Record<string, unknown>; fremd?: boolean; wurf?: boolean; root?: string } = {}) {
   const antworten = { ...GIT, ...abweichend }
   const aufrufe: string[] = []
+  const umgebung: unknown[] = []
   const toasts: string[] = []
-  let gespeichert: unknown = opts.store
+  const speicher = new Map<string, unknown>(Object.entries(opts.store ?? {}))
+  let letzterKey = ''
   const $ = {
-    store: { get: () => Promise.resolve(gespeichert), set: (_k: string, v: unknown) => ((gespeichert = v), Promise.resolve()) },
+    store: {
+      get: (k: string) => Promise.resolve(speicher.get(k)),
+      set: (k: string, v: unknown) => ((letzterKey = k), speicher.set(k, v), Promise.resolve()),
+    },
     session: { id: () => Promise.resolve('s1') },
-    clock: { sleep: () => ((opts.fremd ? (gespeichert = { at: JETZT, von: 'andere' }) : undefined), Promise.resolve()) },
-    plugin: { name: 'may-kit-panel', root: 'C:/kit/mods/may-kit-panel' },
+    clock: { sleep: () => (opts.fremd ? speicher.set(letzterKey, { von: 'andere' }) : undefined, Promise.resolve()) },
+    plugin: { name: 'may-kit-panel', root: opts.root ?? 'C:\\kit\\mods\\may-kit-panel' },
     process: {
-      run: (argv: readonly string[]) => {
+      run: (argv: readonly string[], init?: { env?: unknown }) => {
+        if (opts.wurf) return Promise.reject(new Error('timed out'))
         // "-C <dir>" dropped and the installer path shortened, so the calls read as commands
         const teile: string[] = []
         for (let i = 0; i < argv.length; i++) {
           const a = argv[i] ?? ''
           if (a === '-C') i++
-          else teile.push(a.endsWith('install.ps1') ? 'install.ps1' : a)
+          else teile.push(a.endsWith('install.ps1') && a.includes('/') ? 'install.ps1' : a)
         }
         const zeile = teile.join(' ')
         aufrufe.push(zeile)
-        const r = Object.entries(antworten).find(([k]) => zeile.startsWith(k))?.[1] ?? { exitCode: 0 }
+        umgebung.push(init?.env)
+        const r = Object.entries(antworten)
+          .sort(([a], [b]) => b.length - a.length)
+          .find(([k]) => zeile.startsWith(k))?.[1] ?? { exitCode: 0 }
         return Promise.resolve({ exitCode: r.exitCode, stdout: r.stdout ?? '', stderr: r.stderr ?? '' })
       },
     },
     ui: { toast: (t: string) => void toasts.push(t) },
   }
-  return { $: $ as unknown as Parameters<typeof aktualisieren>[0], aufrufe, toasts, gespeichert: () => gespeichert }
+  return { $: $ as unknown as Parameters<typeof aktualisieren>[0], aufrufe, umgebung, toasts, speicher }
 }
 
-test('the daily update pulls a clean main and names what came in; not due, it runs nothing', async () => {
+test('the daily update fast-forwards a clean main without a second fetch and names what came in', async () => {
   const a = updateAttrappe()
-  expect(await aktualisieren(a.$, 'en', JETZT, 0)).toBe('aktualisiert')
-  expect(a.aufrufe).toContain('git pull --ff-only --quiet')
-  expect(a.aufrufe.some(z => z.startsWith('powershell'))).toBe(false)
-  expect(a.toasts).toEqual(['may-kit updated (2 commits): feat: neu. Takes effect in new chats.'])
-  expect((a.gespeichert() as { at: number }).at).toBe(JETZT)
+  expect(await aktualisieren(a.$, 'C:/kit', 'en', JETZT, 0)).toBe('aktualisiert')
+  expect(a.aufrufe.filter(z => z.startsWith('git fetch'))).toHaveLength(1)
+  expect(a.aufrufe).toContain('git merge --ff-only --quiet @{u}')
+  expect(a.aufrufe.some(z => z.startsWith('git pull'))).toBe(false)
+  expect(a.toasts).toEqual(['may-kit updated (2 commits): feat: neu. New chats use it.'])
+  expect((a.speicher.get('updateGeprueft') as { at: number }).at).toBe(JETZT)
+  // git never asks for credentials in the background
+  expect(a.umgebung[0]).toEqual({ GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never' })
   // an hour later nothing is due: no process starts, no toast
-  const b = updateAttrappe({}, { store: { at: JETZT - 60 * 60 * 1000, von: 'x' } })
-  expect(await aktualisieren(b.$, 'en', JETZT, 0)).toBe('nicht-faellig')
+  const b = updateAttrappe({}, { store: { updateGeprueft: { at: JETZT - 60 * 60 * 1000, von: 'x' } } })
+  expect(await aktualisieren(b.$, 'C:/kit', 'en', JETZT, 0)).toBe('nicht-faellig')
   expect(b.aufrufe).toEqual([])
   expect(b.toasts).toEqual([])
 })
 
-test('the installer runs after the pull when installer files came in; elsewhere than Windows the toast asks for it', async () => {
-  const win = updateAttrappe({ 'git diff': { exitCode: 0, stdout: 'set-user-settings.cjs\n' } })
-  expect(await aktualisieren(win.$, 'de', JETZT, 0)).toBe('aktualisiert')
-  const pull = win.aufrufe.indexOf('git pull --ff-only --quiet')
-  expect(win.aufrufe[pull + 1]).toBe('powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File install.ps1')
-  expect(win.toasts).toEqual(['may-kit aktualisiert (2 Commits): feat: neu. Wirkt in neuen Chats.'])
-  const linux = updateAttrappe({
-    'git rev-parse --show-toplevel': { exitCode: 0, stdout: '/home/u/may-kit\n' },
-    'git diff': { exitCode: 0, stdout: 'install.ps1\n' },
-  })
-  expect(await aktualisieren(linux.$, 'en', JETZT, 0)).toBe('aktualisiert')
-  expect(linux.aufrufe.some(z => z.startsWith('powershell'))).toBe(false)
-  expect(linux.toasts[0]).toContain('Please run the installer yourself')
-  const kaputt = updateAttrappe({
-    'git diff': { exitCode: 0, stdout: 'install.ps1\n' },
-    'powershell.exe': { exitCode: 1, stderr: 'boom\nCould not read settings.json' },
-  })
-  expect(await aktualisieren(kaputt.$, 'en', JETZT, 0)).toBe('installer-fehler')
-  expect(kaputt.toasts).toEqual(['may-kit pulled, the installer reports: Could not read settings.json'])
-})
-
-test('local changes, another branch, own commits or a failed pull leave the clone alone with one toast', async () => {
+test('local changes, another branch, own commits or a failed merge leave the clone alone with one toast', async () => {
   const fall = async (abweichend: Record<string, Antwort>, erwartet: string, toast: string) => {
     const a = updateAttrappe(abweichend)
-    expect(await aktualisieren(a.$, 'en', JETZT, 0)).toBe(erwartet)
+    expect(await aktualisieren(a.$, 'C:/kit', 'en', JETZT, 0)).toBe(erwartet)
     expect(a.toasts).toEqual([toast])
-    if (erwartet !== 'pull-fehler') expect(a.aufrufe.some(z => z.startsWith('git pull'))).toBe(false)
+    if (erwartet !== 'pull-fehler') expect(a.aufrufe.some(z => z.startsWith('git merge'))).toBe(false)
   }
   await fall({ 'git status': { exitCode: 0, stdout: ' M CLAUDE.md\n' } }, 'aenderungen', 'may-kit update waiting: local changes in the clone')
   await fall({ 'git rev-parse --abbrev-ref': { exitCode: 0, stdout: 'feature\n' } }, 'branch', 'may-kit update waiting: the clone is on feature, not on main')
   await fall({ 'git rev-list': { exitCode: 0, stdout: '1\t2\n' } }, 'voraus', 'may-kit update waiting: commits of its own in the clone, not pushed yet')
   await fall(
-    { 'git pull': { exitCode: 1, stderr: 'fatal: Not possible to fast-forward, aborting.' } },
+    { 'git merge': { exitCode: 128, stderr: 'hint: see git help\nfatal: Not possible to fast-forward, aborting.' } },
     'pull-fehler',
     'may-kit update waiting: git pull failed (fatal: Not possible to fast-forward, aborting.)',
   )
 })
 
-test('offline, outside a git clone or when another session claimed the check, the update stays silent', async () => {
-  const offline = updateAttrappe({ 'git fetch': { exitCode: 128, stderr: 'Could not resolve host' } })
-  expect(await aktualisieren(offline.$, 'en', JETZT, 0)).toBe('offline')
-  expect(offline.toasts).toEqual([])
+test('offline, no upstream, unreadable git output, a failing process or a parallel merge: silent', async () => {
+  const still = async (abweichend: Record<string, Antwort>, erwartet: string, opts: { wurf?: boolean } = {}) => {
+    const a = updateAttrappe(abweichend, opts)
+    expect(await aktualisieren(a.$, 'C:/kit', 'en', JETZT, 0)).toBe(erwartet)
+    expect(a.toasts).toEqual([])
+    expect(a.aufrufe.some(z => z.startsWith('git merge')) && erwartet !== 'andere-session').toBe(false)
+    return a
+  }
+  const offline = await still({ 'git fetch': { exitCode: 128, stderr: 'Could not resolve host' } }, 'offline')
   // the claim stands: the next try comes the next day, not with every turn
-  expect((offline.gespeichert() as { at: number }).at).toBe(JETZT)
-  const ohneRepo = updateAttrappe({ 'git rev-parse --show-toplevel': { exitCode: 128 } })
-  expect(await aktualisieren(ohneRepo.$, 'en', JETZT, 0)).toBe('kein-repo')
-  expect(ohneRepo.toasts).toEqual([])
+  expect((offline.speicher.get('updateGeprueft') as { at: number }).at).toBe(JETZT)
+  await still({ 'git rev-list': { exitCode: 128, stderr: 'no upstream' } }, 'kein-upstream')
+  await still({ 'git rev-list': { exitCode: 0, stdout: 'kaputt\n' } }, 'kein-upstream')
+  await still({ 'git status': { exitCode: 128 } }, 'kein-upstream')
+  await still({}, 'offline', { wurf: true })
+  await still({ 'git merge': { exitCode: 128, stderr: "fatal: Unable to create 'C:/kit/.git/index.lock': File exists." } }, 'andere-session')
   const fremd = updateAttrappe({}, { fremd: true })
-  expect(await aktualisieren(fremd.$, 'en', JETZT, 5)).toBe('andere-session')
+  expect(await aktualisieren(fremd.$, 'C:/kit', 'en', JETZT, 5)).toBe('andere-session')
   expect(fremd.aufrufe).toEqual([])
+})
+
+test('only the clone that holds the plugin under mods/ and tracks the installer is updated', async () => {
+  expect(await kitFinden(updateAttrappe().$)).toBe('C:/kit')
+  // a copy of the mod inside another repo (dotfiles): not ours
+  expect(await kitFinden(updateAttrappe({}, { root: 'C:\\dotfiles\\claude\\may-kit-panel' }).$)).toBe(null)
+  expect(await kitFinden(updateAttrappe({ 'git rev-parse --show-toplevel': { exitCode: 0, stdout: 'C:/dotfiles\n' } }).$)).toBe(null)
+  expect(await kitFinden(updateAttrappe({ 'git ls-files': { exitCode: 1 } }).$)).toBe(null)
+  expect(await kitFinden(updateAttrappe({ 'git rev-parse --show-toplevel': { exitCode: 128 } }).$)).toBe(null)
+  expect(await kitFinden(updateAttrappe({}, { wurf: true }).$)).toBe(null)
+})
+
+test('the installer runs whenever its state differs from the last successful run, not only after a pull', async () => {
+  // first check on a machine: nothing stored, the installer runs once and its state is kept
+  const erst = updateAttrappe()
+  expect(await installerPruefen(erst.$, 'C:/kit', 'en', JETZT, 0)).toBe('installiert')
+  expect(erst.aufrufe).toContain('powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File install.ps1')
+  const stand = erst.speicher.get('installiert') as { stand: string; ok: boolean }
+  expect(stand).toEqual({ stand: 'aaa\nbbb\nmods/may-kit-panel', ok: true, at: JETZT })
+  // the same state again: nothing runs
+  const wieder = updateAttrappe({}, { store: { installiert: stand } })
+  expect(await installerPruefen(wieder.$, 'C:/kit', 'en', JETZT, 0)).toBe('aktuell')
+  expect(wieder.aufrufe.some(z => z.startsWith('powershell'))).toBe(false)
+  // a pulled installer (by hand or by the panel) changes the blob: it runs again
+  const neu = updateAttrappe({ 'git rev-parse HEAD:install.ps1': { exitCode: 0, stdout: 'ccc\nbbb\n' } }, { store: { installiert: stand } })
+  expect(await installerPruefen(neu.$, 'C:/kit', 'en', JETZT, 0)).toBe('installiert')
+})
+
+test('a failed installer run is toasted and retried the next day, not at every start', async () => {
+  const kaputt = updateAttrappe({ 'powershell.exe': { exitCode: 1, stderr: 'Could not read settings.json\n+ throw "x"\n' } })
+  expect(await installerPruefen(kaputt.$, 'C:/kit', 'en', JETZT, 0)).toBe('installer-fehler')
+  expect(kaputt.toasts).toEqual(['may-kit pulled, the installer reports: Could not read settings.json'])
+  const versuch = kaputt.speicher.get('installiert') as Record<string, unknown>
+  expect(versuch.ok).toBe(false)
+  const gleichTag = updateAttrappe({ 'powershell.exe': { exitCode: 1 } }, { store: { installiert: versuch } })
+  expect(await installerPruefen(gleichTag.$, 'C:/kit', 'en', JETZT + 60_000, 0)).toBe('aktuell')
+  const naechsterTag = updateAttrappe({}, { store: { installiert: versuch } })
+  expect(await installerPruefen(naechsterTag.$, 'C:/kit', 'en', JETZT + 25 * 60 * 60 * 1000, 0)).toBe('installiert')
+  // elsewhere than Windows a toast asks for it, once per state
+  const linux = updateAttrappe()
+  expect(await installerPruefen(linux.$, '/home/u/may-kit', 'en', JETZT, 0)).toBe('selbst')
+  expect(linux.toasts).toEqual(['may-kit changed: please run the installer yourself (INSTALL.md).'])
+  expect(linux.aufrufe.some(z => z.startsWith('powershell'))).toBe(false)
 })

@@ -1,5 +1,7 @@
 ﻿# Links the user-scope Claude Code configuration from this repo into ~/.claude.
-# Run once per machine after cloning; afterwards `git pull` is enough.
+# Run once per machine after cloning. Afterwards the may-kit panel keeps the clone up to date and runs
+# this script again whenever install.ps1, set-user-settings.cjs or the list of mods changed. After a
+# `git pull` by hand, run it again yourself (or let the panel do it at the next session start).
 #
 #   powershell -ExecutionPolicy Bypass -File .\install.ps1
 #

@@ -389,3 +389,32 @@ test('a prompt goes out with the line naming model and effort beside it', async 
     'may-kit: running Opus high. A turn that changes files starts with the **Model:** line (CLAUDE.md §3). Same model → carry on, no **Next:**.',
   )
 })
+
+// Review 2026-11-08 (findings 3, 9, 10): the line follows the live model, /effort, skills; no line for notifications and local commands.
+test('the prompt line follows /effort and the live model, skips notifications and local commands, keeps skills', async ($, on) => {
+  const gesehen: Array<{ text: string; context?: readonly string[] }> = []
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('prompt.submit', (_, e) => (gesehen.push({ text: e.text, context: e.context }), { text: e.text, context: e.context }))
+  let modell = 'claude-opus-5-5'
+  on('session.model', () => ({ value: modell }) as never)
+  on('settings.read', () => ({ value: 'high' }) as never)
+  await $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
+  const senden = (text: string, extra: Record<string, unknown> = {}) =>
+    $.prompt.submit({ text, wait: false, origin: { kind: 'composer' }, ...extra })
+  const zeile = () => gesehen.at(-1)?.context?.find(c => c.startsWith('may-kit:'))
+
+  await senden('', { command: { name: 'effort', args: 'xhigh' } })
+  expect(zeile()).toBe(undefined)
+  await senden('Go on')
+  expect(zeile()?.startsWith('may-kit: running Opus xhigh.')).toBe(true)
+  // the VS Code dropdown changes the model without /model: the line names the live one, effort from the setting
+  modell = 'claude-sonnet-5-5'
+  await senden('Next step')
+  expect(zeile()?.startsWith('may-kit: running Sonnet high.')).toBe(true)
+  await senden('Background task finished', { isMeta: true })
+  expect(zeile()).toBe(undefined)
+  await senden('', { command: { name: 'compact', args: '' } })
+  expect(zeile()).toBe(undefined)
+  await senden('the diff', { command: { name: 'code-review', args: 'the diff' } })
+  expect(zeile()?.startsWith('may-kit: running Sonnet high.')).toBe(true)
+})

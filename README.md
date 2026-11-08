@@ -106,7 +106,9 @@ The installer links `CLAUDE.md` and `output-styles/` into `~/.claude/`, backs up
 
 ## Updates
 
-Once a day the panel checks GitHub on its own, at the start of a chat or after a turn: `git fetch`, and if `main` is behind, `git pull --ff-only` and the installer. A toast names what came in; it takes effect in new chats. Nothing is touched while the clone is on another branch, has local changes or commits of its own: then a toast names the reason, at most once a day. Offline it stays silent. No tokens: the panel runs git itself, no model is involved.
+Once a day the panel checks GitHub on its own, at the start of a chat or after a turn: `git fetch`, and if `main` is behind, a fast-forward to it. A toast names what came in. New chats load the new rules and style; where Claude Code watches the mod folder (the terminal), running sessions reload the panel at once. Nothing is touched while the clone is on another branch, has local changes or commits of its own: then a toast names the reason, at most once a day. Offline it stays silent.
+
+The installer runs again whenever `install.ps1`, `set-user-settings.cjs` or the list of mods differs from its last successful run — checked at every chat start, so an interrupted run or a `git pull` by hand is caught too. On Windows the panel runs it; elsewhere a toast asks for it. No tokens: the panel runs git itself, no model is involved. The panel only updates the clone it was loaded from, and only if that repo holds it under `mods/` and tracks the installer.
 
 The panel also puts one line beside each prompt, unseen by you: `may-kit: running Opus high. …`. It tells Claude the running model and effort, so it can tell the "stays" case (model line, carry on) from a real switch (`**Next:**`).
 
