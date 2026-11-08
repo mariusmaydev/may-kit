@@ -109,6 +109,17 @@ const DE = {
   schwerToastAus: 'Schwerlast-Sperre aus (nur dieser Rechner)',
   schwerToastAn: 'Schwerlast-Sperre an',
   schwerNichtGeschrieben: (g: string) => `Schwerlast-Sperre nicht umgestellt: ${g}`,
+  updateFertig: (n: number, betreff: string) => `may-kit aktualisiert (${n} ${n === 1 ? 'Commit' : 'Commits'}): ${betreff}. Wirkt in neuen Chats.`,
+  updateInstallerSelbst: ' Installer bitte selbst laufen lassen (INSTALL.md).',
+  updateInstallerFehler: (g: string) => `may-kit gezogen, der Installer meldet: ${g}`,
+  updateWartet: (grund: string) => `may-kit-Update wartet: ${grund}`,
+  updateGrund: {
+    branch: (b: string) => `der Klon steht auf ${b}, nicht auf main`,
+    aenderungen: 'lokale Änderungen im Klon',
+    voraus: 'eigene Commits im Klon, noch nicht gepusht',
+    pull: (g: string) => `git pull fehlgeschlagen (${g})`,
+  },
+  hilfeUpdate: 'Updates: Das Panel prüft einmal am Tag auf GitHub und installiert neue Versionen selbst. Sie wirken in neuen Chats.',
 }
 
 const EN: typeof DE = {
@@ -169,6 +180,17 @@ const EN: typeof DE = {
   schwerToastAus: 'Heavy-load lock off (this machine only)',
   schwerToastAn: 'Heavy-load lock on',
   schwerNichtGeschrieben: (g: string) => `Heavy-load lock not switched: ${g}`,
+  updateFertig: (n: number, betreff: string) => `may-kit updated (${n} ${n === 1 ? 'commit' : 'commits'}): ${betreff}. Takes effect in new chats.`,
+  updateInstallerSelbst: ' Please run the installer yourself (INSTALL.md).',
+  updateInstallerFehler: (g: string) => `may-kit pulled, the installer reports: ${g}`,
+  updateWartet: (grund: string) => `may-kit update waiting: ${grund}`,
+  updateGrund: {
+    branch: (b: string) => `the clone is on ${b}, not on main`,
+    aenderungen: 'local changes in the clone',
+    voraus: 'commits of its own in the clone, not pushed yet',
+    pull: (g: string) => `git pull failed (${g})`,
+  },
+  hilfeUpdate: 'Updates: once a day the panel checks GitHub and installs new versions by itself. They take effect in new chats.',
 }
 
 const TEXTE: Record<Sprache, typeof DE> = { de: DE, en: EN }
@@ -377,7 +399,7 @@ async function agentenLaufen($: Dollar): Promise<boolean> {
 const traegtHinweis = (text: string) =>
   /REVIEW RECOMMENDATION|REVIEW-EMPFEHLUNG|Compact now|Jetzt komprimieren|\*\*(?:Weiter|Next):\*\*/.test(text) || meldetReview(text)
 
-/** Feedback of a blocking Stop hook (such as hooks/model-line.mjs), handed to the model as a user message: part of the turn, no prompt. */
+/** Feedback of a blocking Stop hook (may-kit's own model-line.mjs did this until it was removed), handed to the model as a user message: part of the turn, no prompt. */
 const istHookRueckmeldung = (text: string) => /^\s*Stop hook feedback:|may-kit, CLAUDE\.md §3:/.test(text)
 
 /**
@@ -485,12 +507,16 @@ async function verdichten($: Dollar, befehl: string | null, spr: Sprache): Promi
 export async function modellWechseln($: Dollar, wahl: Modellwahl, s?: Sperre, aktuell?: Vorher | null, spr: Sprache = 'en') {
   const t = TEXTE[spr]
   try {
-    await vorherMerken($, aktuell === undefined ? await aktuellLesen($) : aktuell)
+    const vorWechsel = aktuell === undefined ? await aktuellLesen($) : aktuell
+    await vorherMerken($, vorWechsel)
     if (wahl.compactOffen && !(await verdichten($, wahl.compactBefehl, spr))) return
     await $.command.run({ command: 'model', args: wahl.modell })
+    zuletzt = nachBefehl(zuletzt ?? vorWechsel, 'model', wahl.modell)
     const befehle = await $.command.list().catch(() => [])
-    if (befehle.some(c => c.name === 'effort')) await $.command.run({ command: 'effort', args: wahl.effort })
-    else $.ui.toast(t.effortNichtGesetzt(wahl.effort))
+    if (befehle.some(c => c.name === 'effort')) {
+      await $.command.run({ command: 'effort', args: wahl.effort })
+      zuletzt = nachBefehl(zuletzt, 'effort', wahl.effort)
+    } else $.ui.toast(t.effortNichtGesetzt(wahl.effort))
     await update($, modellwahl, () => null).catch(() => undefined)
     const r = await $.prompt.submit({ text: umsetzBefehl(wahl, spr), asUser: true })
     if (r.drop !== undefined) $.ui.toast(t.nichtGesendet(r.drop))
@@ -505,6 +531,29 @@ export async function modellWechseln($: Dollar, wahl: Modellwahl, s?: Sperre, ak
 // settings are no stand-in for it, as a project's effortLevel hides the one /effort wrote. A module
 // variable: a reload starts it over, and until the next request the settings answer.
 let zuletzt: Vorher | null = null
+
+/**
+ * What runs after a /model or /effort (typed, or run by the switch buttons): the prompt line must name
+ * it before the next request reports it. An argument that names no model or effort changes nothing.
+ */
+export function nachBefehl(basis: Vorher | null, befehl: 'model' | 'effort', args: string): Vorher | null {
+  const wert = args.trim().split(/\s+/)[0]?.toLowerCase() ?? ''
+  if (befehl === 'model') return /opus|sonnet|haiku|fable/.test(wert) ? { modell: wert, effort: basis?.effort ?? null } : basis
+  if (!basis) return basis
+  if (wert === 'auto') return { ...basis, effort: null }
+  return /^(?:low|medium|high|xhigh|max)$/.test(wert) ? { ...basis, effort: wert } : basis
+}
+
+/**
+ * The line the panel puts beside each prompt, unseen by the person (CLAUDE.md §3 "Compare before you
+ * recommend"): the system prompt names the model, but nothing names the effort, and a guessed one made
+ * Claude stop with "**Next:**" for nothing. About 30 tokens, behind the prompt: no extra request, the
+ * prompt cache stays.
+ */
+export function kontextZeile(aktuell: Vorher | null): string {
+  const lauf = aktuell ? `running ${modellKurz(aktuell.modell)}${aktuell.effort ? ` ${aktuell.effort}` : ''}. ` : ''
+  return `may-kit: ${lauf}A turn that changes files starts with the **Model:** line (CLAUDE.md §3). Same model → carry on, no **Next:**.`
+}
 
 /** What the session runs on now: the last request's, else /model and the effort setting; null if unreadable. */
 async function aktuellLesen($: Dollar): Promise<Vorher | null> {
@@ -534,8 +583,12 @@ export async function modellZuruecksetzen($: Dollar, v: Vorher, s?: Sperre, spr:
   const t = TEXTE[spr]
   try {
     await $.command.run({ command: 'model', args: v.modell })
+    zuletzt = nachBefehl(zuletzt ?? v, 'model', v.modell)
     const befehle = await $.command.list().catch(() => [])
-    if (v.effort && befehle.some(c => c.name === 'effort')) await $.command.run({ command: 'effort', args: v.effort })
+    if (v.effort && befehle.some(c => c.name === 'effort')) {
+      await $.command.run({ command: 'effort', args: v.effort })
+      zuletzt = nachBefehl(zuletzt, 'effort', v.effort)
+    }
     await update($, vorher, () => null).catch(() => undefined)
     $.ui.toast(t.zurueckAuf(`${modellKurz(v.modell)}${v.effort ? ` ${v.effort}` : ''}`))
   } catch (err) {
@@ -559,10 +612,106 @@ const SPINNER =
   '<animateTransform attributeName="transform" type="rotate" from="0 8 8" to="360 8 8" dur="0.9s" repeatCount="indefinite"/>' +
   '</path></svg>'
 
+// ---------- Daily update (2026-11-08) ----------
+// Once a day the panel brings the may-kit clone it was loaded from up to date: git and the installer,
+// run by the panel itself — no prompt, no model, so no tokens. Only a clean `main` with nothing of
+// its own ahead is pulled; anything else is left alone with a toast. Running chats keep the old
+// state: mod, CLAUDE.md and style load at session start.
+
+const UPDATE_KEY = 'updateGeprueft'
+export const UPDATE_ABSTAND_MS = 24 * 60 * 60 * 1000
+
+/** Whether the daily check is due: never checked, a day passed, or the clock went back. */
+export function updateFaellig(letzte: unknown, jetzt: number): boolean {
+  const at = typeof letzte === 'object' && letzte !== null ? (letzte as { at?: unknown }).at : undefined
+  if (typeof at !== 'number' || !Number.isFinite(at)) return true
+  return jetzt - at >= UPDATE_ABSTAND_MS || at - jetzt > 60_000
+}
+
+export type UpdateLage = { branch: string; sauber: boolean; voraus: number; zurueck: number }
+export type UpdateGrund = { grund: 'branch' | 'aenderungen' | 'voraus' }
+
+/** What becomes of the clone: nothing new, pull, or leave it with a reason. */
+export function updateEntscheidung(l: UpdateLage): 'aktuell' | 'ziehen' | UpdateGrund {
+  if (l.zurueck <= 0) return 'aktuell'
+  if (l.branch !== 'main') return { grund: 'branch' }
+  if (!l.sauber) return { grund: 'aenderungen' }
+  if (l.voraus > 0) return { grund: 'voraus' }
+  return 'ziehen'
+}
+
+/** Whether the pulled files need the installer again: its own two files, or a new mod's manifest. */
+export const brauchtInstaller = (dateien: string) =>
+  /^(?:install\.ps1|set-user-settings\.cjs|mods\/[^/\n]+\/\.claude-plugin\/plugin\.json)$/m.test(dateien)
+
+const letzteZeile = (s: string) => s.trim().split(/\r?\n/).pop()?.trim() ?? ''
+
+/**
+ * The daily update; `jetzt` and `pause` are parameters for the tests. Resolves to what happened (the
+ * tests read it; the person sees only the toast). A failure of its own never reaches the session.
+ */
+export async function aktualisieren($: Dollar, spr: Sprache = 'en', jetzt = Date.now(), pause = 2000): Promise<string> {
+  const t = TEXTE[spr]
+  if (!updateFaellig(await $.store.get(UPDATE_KEY).catch(() => undefined), jetzt)) return 'nicht-faellig'
+  // Claim the check, wait, look again: of sessions starting together only the last writer goes on.
+  // Claimed before git runs: offline, the next try comes the next day, not with every turn.
+  const ich = { at: jetzt, von: `${await $.session.id().catch(() => '')}-${Math.random()}` }
+  await $.store.set(UPDATE_KEY, ich)
+  if (pause > 0) await $.clock.sleep(pause)
+  const stand = (await $.store.get(UPDATE_KEY).catch(() => undefined)) as { von?: unknown } | undefined
+  if (stand?.von !== ich.von) return 'andere-session'
+
+  const lauf = (argv: string[], timeoutMs = 30_000) =>
+    $.process.run(argv, { timeoutMs }).catch((e: unknown) => ({ exitCode: -1, stdout: '', stderr: e instanceof Error ? e.message : String(e) }))
+  const top = await lauf(['git', '-C', $.plugin.root, 'rev-parse', '--show-toplevel'])
+  if (top.exitCode !== 0) return 'kein-repo'
+  const repo = top.stdout.trim()
+  const git = (args: string[], timeoutMs?: number) => lauf(['git', '-C', repo, ...args], timeoutMs)
+
+  if ((await git(['fetch', '--quiet', 'origin'], 60_000)).exitCode !== 0) return 'offline'
+  const zaehlung = await git(['rev-list', '--left-right', '--count', 'HEAD...@{u}'])
+  if (zaehlung.exitCode !== 0) return 'kein-upstream'
+  const [voraus = 0, zurueck = 0] = zaehlung.stdout.trim().split(/\s+/).map(Number)
+  const branch = (await git(['rev-parse', '--abbrev-ref', 'HEAD'])).stdout.trim()
+  const sauber = (await git(['status', '--porcelain', '--untracked-files=no'])).stdout.trim() === ''
+  const was = updateEntscheidung({ branch, sauber, voraus, zurueck })
+  if (was === 'aktuell') return 'aktuell'
+  if (was !== 'ziehen') {
+    const g = t.updateGrund
+    $.ui.toast(t.updateWartet(was.grund === 'branch' ? g.branch(branch) : g[was.grund]))
+    return was.grund
+  }
+
+  const betreff = (await git(['log', '-1', '--format=%s', '@{u}'])).stdout.trim()
+  const dateien = (await git(['diff', '--name-only', 'HEAD', '@{u}'])).stdout
+  const pull = await git(['pull', '--ff-only', '--quiet'], 120_000)
+  if (pull.exitCode !== 0) {
+    $.ui.toast(t.updateWartet(t.updateGrund.pull(letzteZeile(pull.stderr || pull.stdout))))
+    return 'pull-fehler'
+  }
+  let nachsatz = ''
+  if (brauchtInstaller(dateien)) {
+    // Windows: install.ps1 as INSTALL.md says. Elsewhere the installer needs paths the panel does not
+    // know (settings file, mod list): the toast asks for it.
+    if (/^[A-Za-z]:[\\/]/.test(repo)) {
+      const inst = await lauf(['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', `${repo}/install.ps1`], 120_000)
+      if (inst.exitCode !== 0) {
+        $.ui.toast(t.updateInstallerFehler(letzteZeile(inst.stderr || inst.stdout)))
+        return 'installer-fehler'
+      }
+    } else nachsatz = t.updateInstallerSelbst
+  }
+  $.ui.toast(t.updateFertig(zurueck, betreff) + nachsatz)
+  return 'aktualisiert'
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const r = await next(e)
-    void umgebungLesen($).catch(() => undefined)
+    void umgebungLesen($)
+      .catch(() => undefined)
+      .then(async () => aktualisieren($, await read($, sprache)))
+      .catch(() => undefined)
     return r
   })
 
@@ -579,7 +728,16 @@ export const register: Register = on => {
     if (startetReview(e.text, e.command?.name)) {
       await update($, hinweis, (alt): Hinweis | null => (alt && alt.phase === 'review' ? { ...alt, phase: 'review-laeuft' } : alt)).catch(() => undefined)
     }
-    return next(e)
+    const befehl = e.command?.name
+    if (befehl === 'model' || befehl === 'effort') {
+      const basis = zuletzt ?? (await aktuellLesen($))
+      zuletzt = nachBefehl(basis, befehl, e.command?.args ?? '') ?? zuletzt
+    }
+    // A slash command or the engine's own message (a notification) gets no line: no turn of the
+    // person's begins with it.
+    if (befehl || e.isMeta) return next(e)
+    const zeile = kontextZeile(await aktuellLesen($).catch(() => null))
+    return next({ ...e, context: [...(e.context ?? []), zeile] })
   })
 
   on('turn.complete', async ($, e, next) => {
@@ -588,6 +746,8 @@ export const register: Register = on => {
         // the language first: the review order a recommendation turns into is worded in it
         await umgebungLesen($).catch(() => undefined)
         const spr = await read($, sprache)
+        // the daily update: one store read when nothing is due; not awaited, git may take a while
+        void aktualisieren($, spr).catch(() => undefined)
         const alt = await read($, hinweis)
         const laufen = await agentenLaufen($)
         const antwort = await letzteAntwort($)
@@ -879,6 +1039,13 @@ export const register: Register = on => {
             </Box>
           ))
         : null}
+      {hilfeOffen ? (
+        <Box key="hilfe-update">
+          <Text dimColor wrap="wrap">
+            {t.hilfeUpdate}
+          </Text>
+        </Box>
+      ) : null}
       </Box>
     )
   })

@@ -1,11 +1,18 @@
 import { expect, test } from 'claude-code/testing'
 
 import {
+  aktualisieren,
   antwortDerRunde,
+  brauchtInstaller,
   compactAnweisung,
   compactAus,
+  kontextZeile,
   komprimieren,
   modellAus,
+  nachBefehl,
+  updateEntscheidung,
+  updateFaellig,
+  UPDATE_ABSTAND_MS,
   modellWechseln,
   modusAus,
   modusBefehl,
@@ -379,4 +386,156 @@ test('the override file: the button switches only schwerlast', () => {
   // pressing twice returns to the start
   expect(schwerlastUmschalten(schwerlastUmschalten('ohne: pakete\n'))).toBe('ohne: pakete\n')
   expect(schwerlastUmschalten('ohne: pakete\r\n')).toBe('ohne: pakete, schwerlast\n')
+})
+
+// 2026-11-08: the line beside each prompt names model and effort, so Claude can tell "stays" from a switch.
+test('the prompt line names the running model and effort, or only the rule', () => {
+  const regel = 'A turn that changes files starts with the **Model:** line (CLAUDE.md §3). Same model → carry on, no **Next:**.'
+  expect(kontextZeile({ modell: 'claude-opus-5-5', effort: 'high' })).toBe(`may-kit: running Opus high. ${regel}`)
+  expect(kontextZeile({ modell: 'sonnet', effort: null })).toBe(`may-kit: running Sonnet. ${regel}`)
+  expect(kontextZeile(null)).toBe(`may-kit: ${regel}`)
+})
+
+test('/model and /effort update what the line names; other arguments change nothing', () => {
+  const opusHigh = { modell: 'claude-opus-5-5', effort: 'high' }
+  expect(nachBefehl(opusHigh, 'effort', 'xhigh')).toEqual({ modell: 'claude-opus-5-5', effort: 'xhigh' })
+  expect(nachBefehl(opusHigh, 'effort', 'auto')).toEqual({ modell: 'claude-opus-5-5', effort: null })
+  expect(nachBefehl(opusHigh, 'effort', '')).toBe(opusHigh)
+  expect(nachBefehl(opusHigh, 'model', 'sonnet')).toEqual({ modell: 'sonnet', effort: 'high' })
+  expect(nachBefehl(opusHigh, 'model', '')).toBe(opusHigh)
+  expect(nachBefehl(null, 'model', 'Opus')).toEqual({ modell: 'opus', effort: null })
+  expect(nachBefehl(null, 'effort', 'high')).toBe(null)
+})
+
+test('the daily check is due after a day, never before, and when the clock went back', () => {
+  const jetzt = 1_800_000_000_000
+  expect(updateFaellig(undefined, jetzt)).toBe(true)
+  expect(updateFaellig({ at: 'gestern' }, jetzt)).toBe(true)
+  expect(updateFaellig({ at: jetzt - 60 * 60 * 1000 }, jetzt)).toBe(false)
+  expect(updateFaellig({ at: jetzt - UPDATE_ABSTAND_MS }, jetzt)).toBe(true)
+  expect(updateFaellig({ at: jetzt + 2 * 60 * 60 * 1000 }, jetzt)).toBe(true)
+})
+
+test('only a clean main with nothing of its own ahead is pulled', () => {
+  const lage = { branch: 'main', sauber: true, voraus: 0, zurueck: 2 }
+  expect(updateEntscheidung(lage)).toBe('ziehen')
+  expect(updateEntscheidung({ ...lage, zurueck: 0 })).toBe('aktuell')
+  expect(updateEntscheidung({ ...lage, zurueck: 0, voraus: 3, sauber: false })).toBe('aktuell')
+  expect(updateEntscheidung({ ...lage, branch: 'feature' })).toEqual({ grund: 'branch' })
+  expect(updateEntscheidung({ ...lage, sauber: false })).toEqual({ grund: 'aenderungen' })
+  expect(updateEntscheidung({ ...lage, voraus: 1 })).toEqual({ grund: 'voraus' })
+  expect(brauchtInstaller('CLAUDE.md\nmods/may-kit-panel/hooks/register.tsx\n')).toBe(false)
+  expect(brauchtInstaller('README.md\nset-user-settings.cjs\n')).toBe(true)
+  expect(brauchtInstaller('install.ps1\n')).toBe(true)
+  expect(brauchtInstaller('mods/neu/.claude-plugin/plugin.json\n')).toBe(true)
+})
+
+type Antwort = { exitCode: number; stdout?: string; stderr?: string }
+const JETZT = 1_800_000_000_000
+const GIT: Record<string, Antwort> = {
+  'git rev-parse --show-toplevel': { exitCode: 0, stdout: 'C:/kit\n' },
+  'git fetch': { exitCode: 0 },
+  'git rev-list': { exitCode: 0, stdout: '0\t2\n' },
+  'git rev-parse --abbrev-ref': { exitCode: 0, stdout: 'main\n' },
+  'git status': { exitCode: 0, stdout: '' },
+  'git log': { exitCode: 0, stdout: 'feat: neu\n' },
+  'git diff': { exitCode: 0, stdout: 'CLAUDE.md\n' },
+  'git pull': { exitCode: 0 },
+}
+
+/** A `$` with store, clock, process and toast in memory; `fremd`: another session claims during the pause. */
+function updateAttrappe(abweichend: Record<string, Antwort> = {}, opts: { store?: unknown; fremd?: boolean } = {}) {
+  const antworten = { ...GIT, ...abweichend }
+  const aufrufe: string[] = []
+  const toasts: string[] = []
+  let gespeichert: unknown = opts.store
+  const $ = {
+    store: { get: () => Promise.resolve(gespeichert), set: (_k: string, v: unknown) => ((gespeichert = v), Promise.resolve()) },
+    session: { id: () => Promise.resolve('s1') },
+    clock: { sleep: () => ((opts.fremd ? (gespeichert = { at: JETZT, von: 'andere' }) : undefined), Promise.resolve()) },
+    plugin: { name: 'may-kit-panel', root: 'C:/kit/mods/may-kit-panel' },
+    process: {
+      run: (argv: readonly string[]) => {
+        // "-C <dir>" dropped and the installer path shortened, so the calls read as commands
+        const teile: string[] = []
+        for (let i = 0; i < argv.length; i++) {
+          const a = argv[i] ?? ''
+          if (a === '-C') i++
+          else teile.push(a.endsWith('install.ps1') ? 'install.ps1' : a)
+        }
+        const zeile = teile.join(' ')
+        aufrufe.push(zeile)
+        const r = Object.entries(antworten).find(([k]) => zeile.startsWith(k))?.[1] ?? { exitCode: 0 }
+        return Promise.resolve({ exitCode: r.exitCode, stdout: r.stdout ?? '', stderr: r.stderr ?? '' })
+      },
+    },
+    ui: { toast: (t: string) => void toasts.push(t) },
+  }
+  return { $: $ as unknown as Parameters<typeof aktualisieren>[0], aufrufe, toasts, gespeichert: () => gespeichert }
+}
+
+test('the daily update pulls a clean main and names what came in; not due, it runs nothing', async () => {
+  const a = updateAttrappe()
+  expect(await aktualisieren(a.$, 'en', JETZT, 0)).toBe('aktualisiert')
+  expect(a.aufrufe).toContain('git pull --ff-only --quiet')
+  expect(a.aufrufe.some(z => z.startsWith('powershell'))).toBe(false)
+  expect(a.toasts).toEqual(['may-kit updated (2 commits): feat: neu. Takes effect in new chats.'])
+  expect((a.gespeichert() as { at: number }).at).toBe(JETZT)
+  // an hour later nothing is due: no process starts, no toast
+  const b = updateAttrappe({}, { store: { at: JETZT - 60 * 60 * 1000, von: 'x' } })
+  expect(await aktualisieren(b.$, 'en', JETZT, 0)).toBe('nicht-faellig')
+  expect(b.aufrufe).toEqual([])
+  expect(b.toasts).toEqual([])
+})
+
+test('the installer runs after the pull when installer files came in; elsewhere than Windows the toast asks for it', async () => {
+  const win = updateAttrappe({ 'git diff': { exitCode: 0, stdout: 'set-user-settings.cjs\n' } })
+  expect(await aktualisieren(win.$, 'de', JETZT, 0)).toBe('aktualisiert')
+  const pull = win.aufrufe.indexOf('git pull --ff-only --quiet')
+  expect(win.aufrufe[pull + 1]).toBe('powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File install.ps1')
+  expect(win.toasts).toEqual(['may-kit aktualisiert (2 Commits): feat: neu. Wirkt in neuen Chats.'])
+  const linux = updateAttrappe({
+    'git rev-parse --show-toplevel': { exitCode: 0, stdout: '/home/u/may-kit\n' },
+    'git diff': { exitCode: 0, stdout: 'install.ps1\n' },
+  })
+  expect(await aktualisieren(linux.$, 'en', JETZT, 0)).toBe('aktualisiert')
+  expect(linux.aufrufe.some(z => z.startsWith('powershell'))).toBe(false)
+  expect(linux.toasts[0]).toContain('Please run the installer yourself')
+  const kaputt = updateAttrappe({
+    'git diff': { exitCode: 0, stdout: 'install.ps1\n' },
+    'powershell.exe': { exitCode: 1, stderr: 'boom\nCould not read settings.json' },
+  })
+  expect(await aktualisieren(kaputt.$, 'en', JETZT, 0)).toBe('installer-fehler')
+  expect(kaputt.toasts).toEqual(['may-kit pulled, the installer reports: Could not read settings.json'])
+})
+
+test('local changes, another branch, own commits or a failed pull leave the clone alone with one toast', async () => {
+  const fall = async (abweichend: Record<string, Antwort>, erwartet: string, toast: string) => {
+    const a = updateAttrappe(abweichend)
+    expect(await aktualisieren(a.$, 'en', JETZT, 0)).toBe(erwartet)
+    expect(a.toasts).toEqual([toast])
+    if (erwartet !== 'pull-fehler') expect(a.aufrufe.some(z => z.startsWith('git pull'))).toBe(false)
+  }
+  await fall({ 'git status': { exitCode: 0, stdout: ' M CLAUDE.md\n' } }, 'aenderungen', 'may-kit update waiting: local changes in the clone')
+  await fall({ 'git rev-parse --abbrev-ref': { exitCode: 0, stdout: 'feature\n' } }, 'branch', 'may-kit update waiting: the clone is on feature, not on main')
+  await fall({ 'git rev-list': { exitCode: 0, stdout: '1\t2\n' } }, 'voraus', 'may-kit update waiting: commits of its own in the clone, not pushed yet')
+  await fall(
+    { 'git pull': { exitCode: 1, stderr: 'fatal: Not possible to fast-forward, aborting.' } },
+    'pull-fehler',
+    'may-kit update waiting: git pull failed (fatal: Not possible to fast-forward, aborting.)',
+  )
+})
+
+test('offline, outside a git clone or when another session claimed the check, the update stays silent', async () => {
+  const offline = updateAttrappe({ 'git fetch': { exitCode: 128, stderr: 'Could not resolve host' } })
+  expect(await aktualisieren(offline.$, 'en', JETZT, 0)).toBe('offline')
+  expect(offline.toasts).toEqual([])
+  // the claim stands: the next try comes the next day, not with every turn
+  expect((offline.gespeichert() as { at: number }).at).toBe(JETZT)
+  const ohneRepo = updateAttrappe({ 'git rev-parse --show-toplevel': { exitCode: 128 } })
+  expect(await aktualisieren(ohneRepo.$, 'en', JETZT, 0)).toBe('kein-repo')
+  expect(ohneRepo.toasts).toEqual([])
+  const fremd = updateAttrappe({}, { fremd: true })
+  expect(await aktualisieren(fremd.$, 'en', JETZT, 5)).toBe('andere-session')
+  expect(fremd.aufrufe).toEqual([])
 })

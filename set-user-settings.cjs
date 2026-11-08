@@ -5,8 +5,7 @@
 //     answers in that language, and the may-kit panel follows it.
 //   - env.CLAUDE_CODE_PLUGIN_DIRS gains <plugin dir> (each mod folder, separated by ";" on
 //     Windows, ":" elsewhere), so every new session loads the repo's mods.
-//   - hooks.Stop gains hooks/model-line.mjs, which asks for the model line of CLAUDE.md §3 when a
-//     turn changed files without it.
+//   - hooks.Stop loses the entry for hooks/model-line.mjs an earlier install added (removed 2026-11-08).
 // Called by install.ps1:
 //   node set-user-settings.cjs <settings.json> <backup stamp> <style> <plugin dir> [<plugin dir> …]
 // The system language comes from MAY_KIT_LOCALE (install.ps1 passes the Windows display language),
@@ -73,20 +72,19 @@ for (const dir of dirs) {
 if (current.length) cfg.env.CLAUDE_CODE_PLUGIN_DIRS = current.join(sep);
 else delete cfg.env.CLAUDE_CODE_PLUGIN_DIRS;
 
-// Stop hook hooks/model-line.mjs (CLAUDE.md §3): one entry, pointing at this repo. An entry left
-// by an earlier location of the repo is replaced; other Stop hooks stay untouched.
-const hookCmd = `node "${path.join(__dirname, "hooks", "model-line.mjs").replace(/\\/g, "/")}"`;
+// The Stop hook hooks/model-line.mjs (2026-11-08, same day removed): it blocked a turn without the
+// model line and cost a whole extra request each time. An entry an earlier install left is taken
+// out; other Stop hooks stay untouched, an emptied Stop list goes.
 const isOurs = (h) => /model-line\.mjs/.test(String(h.command || ""));
-cfg.hooks = cfg.hooks || {};
-const stop = cfg.hooks.Stop || [];
-if (stop.some((g) => (g.hooks || []).some((h) => h.command === hookCmd))) report.push("ok        hook Stop model-line");
-else {
+const stop = cfg.hooks?.Stop;
+if (Array.isArray(stop) && stop.some((g) => (g.hooks || []).some(isOurs))) {
   const rest = stop
     .map((g) => ({ ...g, hooks: (g.hooks || []).filter((h) => !isOurs(h)) }))
     .filter((g) => g.hooks.length);
-  rest.push({ hooks: [{ type: "command", command: hookCmd, timeout: 10 }] });
-  cfg.hooks.Stop = rest;
-  report.push("added     hook Stop model-line");
+  if (rest.length) cfg.hooks.Stop = rest;
+  else delete cfg.hooks.Stop;
+  if (!Object.keys(cfg.hooks).length) delete cfg.hooks;
+  report.push("removed   hook Stop model-line");
 }
 
 // Compare content, not formatting: an unchanged file is never rewritten.

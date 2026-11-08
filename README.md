@@ -102,7 +102,13 @@ ln -s ~/may-kit/output-styles ~/.claude/output-styles
 node ~/may-kit/set-user-settings.cjs ~/.claude/settings.json "$(date +%Y%m%d%H%M%S)" Marius ~/may-kit/mods/may-kit-panel
 ```
 
-The installer links `CLAUDE.md` and `output-styles/` into `~/.claude/`, backs up whatever was there as `*.bak-<timestamp>`, and changes exactly four keys in `~/.claude/settings.json`: `outputStyle`, `env.CLAUDE_CODE_PLUGIN_DIRS`, a Stop hook entry for `hooks/model-line.mjs` (asks for the model line when a turn changed files without it) and — only if it isn't set yet — `language`, taken from your system language (on Windows the display language, elsewhere `LC_ALL` / `LC_MESSAGES` / `LANG`). Open a **new** chat afterwards — style and mod load at session start.
+The installer links `CLAUDE.md` and `output-styles/` into `~/.claude/`, backs up whatever was there as `*.bak-<timestamp>`, and changes exactly three keys in `~/.claude/settings.json`: `outputStyle`, `env.CLAUDE_CODE_PLUGIN_DIRS` and — only if it isn't set yet — `language`, taken from your system language (on Windows the display language, elsewhere `LC_ALL` / `LC_MESSAGES` / `LANG`). It also removes the Stop hook entry for `hooks/model-line.mjs` an earlier version added. Open a **new** chat afterwards — style and mod load at session start.
+
+## Updates
+
+Once a day the panel checks GitHub on its own, at the start of a chat or after a turn: `git fetch`, and if `main` is behind, `git pull --ff-only` and the installer. A toast names what came in; it takes effect in new chats. Nothing is touched while the clone is on another branch, has local changes or commits of its own: then a toast names the reason, at most once a day. Offline it stays silent. No tokens: the panel runs git itself, no model is involved.
+
+The panel also puts one line beside each prompt, unseen by you: `may-kit: running Opus high. …`. It tells Claude the running model and effort, so it can tell the "stays" case (model line, carry on) from a real switch (`**Next:**`).
 
 ## Make it yours
 
@@ -117,8 +123,7 @@ The installer links `CLAUDE.md` and `output-styles/` into `~/.claude/`, backs up
 CLAUDE.md                 global rules, linked to ~/.claude/CLAUDE.md
 INSTALL.md                setup prompt for Claude (machine + project)
 install.ps1               Windows installer
-set-user-settings.cjs     sets the settings keys and the Stop hook, touches nothing else
-hooks/model-line.mjs      Stop hook: model line of CLAUDE.md §3 (test: node --test hooks/model-line.test.mjs)
+set-user-settings.cjs     sets the settings keys, touches nothing else
 output-styles/marius.md   the output style
 mods/may-kit-panel/       the button panel (hooks/register.tsx, tests/)
 ```

@@ -373,3 +373,19 @@ test('the heavy-load button needs the lock hook and rewrites the override file',
   expect(gesendet).toEqual([])
   await ui.unmount()
 })
+
+// 2026-11-08: the prompt carries model and effort for Claude, unseen by the person, the text unchanged.
+test('a prompt goes out with the line naming model and effort beside it', async ($, on) => {
+  const gesehen: Array<{ text: string; context?: readonly string[] }> = []
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('prompt.submit', (_, e) => (gesehen.push({ text: e.text, context: e.context }), { text: e.text, context: e.context }))
+  on('session.model', () => ({ value: 'claude-opus-5-5' }) as never)
+  // read by key: the effort setting answers its value
+  on('settings.read', () => ({ value: 'high' }) as never)
+  await $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
+  await $.prompt.submit({ text: 'Fix the bug', wait: false, origin: { kind: 'composer' } })
+  expect(gesehen.at(-1)?.text).toBe('Fix the bug')
+  expect(gesehen.at(-1)?.context?.at(-1)).toBe(
+    'may-kit: running Opus high. A turn that changes files starts with the **Model:** line (CLAUDE.md §3). Same model → carry on, no **Next:**.',
+  )
+})

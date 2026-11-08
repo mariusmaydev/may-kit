@@ -53,7 +53,7 @@ The **last line of the plan** is the model line from §3 — so it already stand
 
 ## 3. Model recommendation
 
-**When:** in **every turn that changes files** — before the first change to code, configuration or docs, regardless of whether a planning phase ran (§1) and however small the change is. Excepted are only turns without a change (research, questions) and edits to memory, plan or scratchpad files. Even "just do it" does not lift it; it costs a line, not a round. The Stop hook `hooks/model-line.mjs` asks for the line once when a turn changed files without it.
+**When:** in **every turn that changes files** — before the first change to code, configuration or docs, regardless of whether a planning phase ran (§1) and however small the change is. Excepted are only turns without a change (research, questions) and edits to memory, plan or scratchpad files. Even "just do it" does not lift it; it costs a line, not a round.
 
 **The model stays** — exactly one line, then keep working:
 
@@ -74,9 +74,9 @@ Plan: <path> [· then Opus review]
 
 Required content: model, effort, reason; plan file as soon as one has been written (§2); "then Opus review" if §5 already points to "Yes". The spelling `/model` → <model>, Effort <level> is fixed: the mod reads exactly it.
 
-**Compare before you recommend:** Check the recommended model and effort against what is running — the model named in the system prompt, and the effort the session reports (otherwise `effortLevel` in `~/.claude/settings.json`; if neither says, the model alone decides). If both match, it is the "stays" case: write the `**Model:**` line and carry on in the same turn — no `**Next:**`, no waiting for the user. `**Next:**` only when model or effort actually differ.
+**Compare before you recommend:** Check the recommended model against what is running — named in the system prompt and in the line `may-kit: running <model> <effort>` the panel puts beside each prompt. Same model is the "stays" case, even when only the effort differs: write the `**Model:**` line (with the effort you would pick) and carry on in the same turn — no `**Next:**`, no waiting for the user. `**Next:**` only when the model differs.
 
-**Plan mode:** The plan ends with the model line (§2). If it says "**Next:**", approval does **not** start the implementation: write the plan file, output the hint, end the answer. If it says "**Model:**" because the recommended model and effort are already running, approval starts the implementation directly.
+**Plan mode:** The plan ends with the model line (§2). If it says "**Next:**", approval does **not** start the implementation: write the plan file, output the hint, end the answer. If it says "**Model:**" because the recommended model is already running, approval starts the implementation directly.
 
 **Don't omit it:** The line is never silently missing. A missing hint looks like a forgotten one; that is why "fits" is also stated explicitly. The current model counts as right only with a named criterion — "I'm already here" is none.
 
