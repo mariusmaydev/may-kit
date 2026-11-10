@@ -32,7 +32,7 @@ The buttons depend on the project:
 | Model + Effort | always; highlighted after a `**Next:**` hint | runs `/compact` (if named), `/model` and `/effort` and sends the order to implement (§3) |
 | ↺ | after a switch | restores the model and effort from before the first switch |
 | Review | always | sends "Start review" with the commits of the last REVIEW RECOMMENDATION (global `CLAUDE.md` §5) |
-| Compact | always | compacts with the instruction of the last `/compact` hint (§3a) |
+| Compact | always | compacts with the instruction of the last `/compact` hint (§3a); right after such a hint it then sends the order to continue |
 | Live | `scripts/merge.ps1` exists | sends "Release to production"; the project's `CLAUDE.md` has to describe what that means |
 | ⚡ | `.claude/working-mode` exists | sends "Mode fast" / "Mode careful"; grey = careful, yellow = fast |
 | ? | always | opens the explanations |

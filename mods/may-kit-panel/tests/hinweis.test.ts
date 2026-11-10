@@ -5,6 +5,7 @@ import {
   antwortDerRunde,
   compactAnweisung,
   compactAus,
+  gehtWeiter,
   installerPruefen,
   kitFinden,
   kontextZeile,
@@ -28,6 +29,7 @@ import {
   startetReview,
   umsetzBefehl,
   wahlNachAntwort,
+  weiterBefehl,
 } from '../hooks/register'
 
 const REVIEW = [
@@ -226,6 +228,35 @@ test('a refused /compact command is reported', async () => {
   await komprimieren(a.$, null)
   expect(a.befehle).toEqual([{ command: 'compact', args: '' }])
   expect(a.toasts).toEqual(['Not compacted: unknown command'])
+})
+
+// 2026-11-10: after the button's compaction the person had to write "compacted" before work went on.
+test('the compact button goes on by itself only right after a compact hint without a pending switch', async () => {
+  expect(gehtWeiter(COMPACT, false)).toBe(true)
+  expect(gehtWeiter(COMPACT_DE, false)).toBe(true)
+  // no hint in the last answer: the person just compacts
+  expect(gehtWeiter('All done.', false)).toBe(false)
+  // a model switch is due: going on is the "Model + Effort" button's part
+  expect(gehtWeiter(COMPACT, true)).toBe(false)
+  expect(gehtWeiter(WEITER, false)).toBe(false)
+})
+
+test('after a compaction that ran the order to go on is sent; a skipped one sends nothing', async () => {
+  const a = wechselAttrappe({ mitEffort: true })
+  await komprimieren(a.$, '/compact Continue with E12.d', undefined, 'en', true)
+  expect(a.schritte).toEqual([{ compact: { instructions: 'Continue with E12.d' } }, { submit: 'Compacted. Continue with the next section.' }])
+  const de = wechselAttrappe({ mitEffort: true })
+  await komprimieren(de.$, '/compact Weiter mit E12.d', undefined, 'de', true)
+  expect(de.schritte.slice(-1)).toEqual([{ submit: 'Komprimiert. Weiter mit dem nächsten Abschnitt.' }])
+  expect(weiterBefehl('de')).toBe('Komprimiert. Weiter mit dem nächsten Abschnitt.')
+  // without the flag (no hint, or a switch pending) the button only compacts
+  const ohne = wechselAttrappe({ mitEffort: true })
+  await komprimieren(ohne.$, '/compact Continue with E12.d')
+  expect(ohne.schritte).toEqual([{ compact: { instructions: 'Continue with E12.d' } }])
+  const skip = wechselAttrappe({ mitEffort: true, compactSkip: 'nothing to compact' })
+  await komprimieren(skip.$, '/compact Continue with E12.d', undefined, 'en', true)
+  expect(skip.schritte).toHaveLength(1)
+  expect(skip.toasts).toEqual(['Not compacted: nothing to compact'])
 })
 
 test('the mode file: only "fast" (or the former "schnell") is fast, anything else careful', async () => {

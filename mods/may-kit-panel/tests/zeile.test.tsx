@@ -380,8 +380,8 @@ test('a prompt goes out with the line naming model and effort beside it', async 
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('prompt.submit', (_, e) => (gesehen.push({ text: e.text, context: e.context }), { text: e.text, context: e.context }))
   on('session.model', () => ({ value: 'claude-opus-5-5' }) as never)
-  // read by key: the effort setting answers its value
-  on('settings.read', () => ({ value: 'high' }) as never)
+  // the hook answers the merged settings object; the read by key is projected from it
+  on('settings.read', () => ({ value: { effortLevel: 'high' } }) as never)
   await $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
   await $.prompt.submit({ text: 'Fix the bug', wait: false, origin: { kind: 'composer' } })
   expect(gesehen.at(-1)?.text).toBe('Fix the bug')
@@ -397,7 +397,7 @@ test('the prompt line follows /effort and the live model, skips notifications an
   on('prompt.submit', (_, e) => (gesehen.push({ text: e.text, context: e.context }), { text: e.text, context: e.context }))
   let modell = 'claude-opus-5-5'
   on('session.model', () => ({ value: modell }) as never)
-  on('settings.read', () => ({ value: 'high' }) as never)
+  on('settings.read', () => ({ value: { effortLevel: 'high' } }) as never)
   await $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
   const senden = (text: string, extra: Record<string, unknown> = {}) =>
     $.prompt.submit({ text, wait: false, origin: { kind: 'composer' }, ...extra })

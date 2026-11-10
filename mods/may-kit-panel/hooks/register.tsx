@@ -6,6 +6,7 @@ import type { Hinweis, Modellwahl, Sprache, Vorher } from '../types'
 // may-kit-panel — buttons above the prompt: "Model + Effort", "Review" and "Compact" (plus Live and ⚡).
 // "Model + Effort" follows a "**Next:**" hint (CLAUDE.md §3): a press runs the /compact the hint puts
 // first, then /model and /effort, and sends the order to carry out the task.
+// "Compact", pressed right after a "**Compact now:**" hint, sends the order to go on once compacted.
 // They follow the last answer (CLAUDE.md §3a/§5): the step that is due is drawn
 // as the surface's primary button, a press runs it at once. For the review that
 // is the order "Start review" with the commits from the "Commits:" line of a
@@ -84,6 +85,7 @@ const DE = {
   umsetzen: (plan: string | null, modell: string, effort: string) => `Umsetzen${plan ? ` nach Plan ${plan}` : ''} (jetzt ${modell} ${effort}).`,
   reviewStarten: (shas: string, modell: string, effort: string) =>
     `Review starten: Commits ${shas}, Subagent ${modell}/${effort}. Befunde in deinen Dateien beheben, testen, committen.`,
+  weiter: 'Komprimiert. Weiter mit dem nächsten Abschnitt.',
   release: 'Release nach production',
   modusSchnell: 'Modus schnell',
   modusSorgfaeltig: 'Modus sorgfältig',
@@ -95,7 +97,8 @@ const DE = {
     reviewLaeuft: 'Das Review läuft. Ein Klick hakt es von Hand ab.',
     review: 'Schickt „Review starten“ mit den Commits der letzten REVIEW-EMPFEHLUNG: ein Subagent prüft, die Session behebt, testet und committet.',
     compactLaeuft: 'Komprimiert gerade. Ein Klick setzt die Anzeige zurück.',
-    compact: 'Komprimiert den Chat sofort, mit der Anweisung aus dem letzten /compact-Hinweis (sonst ohne).',
+    compact:
+      'Komprimiert den Chat sofort, mit der Anweisung aus dem letzten /compact-Hinweis (sonst ohne). Direkt nach einem solchen Hinweis geht die Arbeit danach von selbst weiter.',
     liveLaeuft: 'Der Release läuft. Ein Klick setzt die Anzeige zurück.',
     live: 'Schickt „Release nach production“ sofort ab: Schema und Functions auf Prod, danach merge.ps1 -Production.',
     blitzAn: 'Schnellmodus an: jede fertige Änderung geht ungefragt und ungeprüft nach Production, für alle Sessions. Klick schaltet aus.',
@@ -156,6 +159,7 @@ const EN: typeof DE = {
   umsetzen: (plan: string | null, modell: string, effort: string) => `Implement${plan ? ` per plan ${plan}` : ''} (now ${modell} ${effort}).`,
   reviewStarten: (shas: string, modell: string, effort: string) =>
     `Start review: commits ${shas}, subagent ${modell}/${effort}. Fix findings in your files, test, commit.`,
+  weiter: 'Compacted. Continue with the next section.',
   release: 'Release to production',
   modusSchnell: 'Mode fast',
   modusSorgfaeltig: 'Mode careful',
@@ -167,7 +171,8 @@ const EN: typeof DE = {
     reviewLaeuft: 'The review is running. A click ticks it off by hand.',
     review: 'Sends “Start review” with the commits of the last REVIEW RECOMMENDATION: a subagent reviews, the session fixes, tests and commits.',
     compactLaeuft: 'Compacting now. A click resets the indicator.',
-    compact: 'Compacts the chat at once, with the instructions from the last /compact hint (none otherwise).',
+    compact:
+      'Compacts the chat at once, with the instructions from the last /compact hint (none otherwise). Right after such a hint the work then goes on by itself.',
     liveLaeuft: 'The release is running. A click resets the indicator.',
     live: 'Sends “Release to production” at once; the project’s CLAUDE.md defines what that means.',
     blitzAn: 'Fast mode on: every finished change goes to production unasked and unchecked, for all sessions. Click switches it off.',
@@ -319,6 +324,18 @@ export function compactAnweisung(befehl: string | null): string | undefined {
   return rest || undefined
 }
 
+/**
+ * Whether the Compact button sends the order to go on once its compaction stands (2026-11-10: the
+ * person had to write "compacted" by hand each time). Only when the last answer itself carries the
+ * compact hint: a hint from turns ago names a goal the conversation has left behind. And never while
+ * a model switch is pending: going on is then the "Model + Effort" button's part, on the right model.
+ */
+export const gehtWeiter = (antwort: string, wechselOffen: boolean) =>
+  compactAus(antwort) !== null && !wechselOffen && modellAus(antwort) === null
+
+/** The order the Compact button sends after its compaction. */
+export const weiterBefehl = (sprache: Sprache = 'en') => TEXTE[sprache].weiter
+
 /** Whether an answer reports the review's result (the table "Finding | Result", or "Befund | Ergebnis", §5 step 3). */
 const meldetReview = (antwort: string) => /\|\s*(?:Finding|Befund)\s*\|\s*(?:Result|Ergebnis)\s*\|/.test(antwort)
 
@@ -465,10 +482,16 @@ async function reviewAbschicken($: Dollar, stand: Hinweis, befehl: string, spr: 
 }
 
 // Compact: straight through the engine, as /compact does. The session.compact hook
-// below shows the spinner and clears the hint once the compaction stands.
-export async function komprimieren($: Dollar, befehl: string | null, s?: Sperre, spr: Sprache = 'en') {
+// below shows the spinner and clears the hint once the compaction stands. With `weiter` the order
+// to go on follows a compaction that ran (see gehtWeiter); a skipped or failed one sends nothing.
+export async function komprimieren($: Dollar, befehl: string | null, s?: Sperre, spr: Sprache = 'en', weiter = false) {
+  const t = TEXTE[spr]
   try {
-    await verdichten($, befehl, spr)
+    if (!(await verdichten($, befehl, spr)) || !weiter) return
+    const r = await $.prompt.submit({ text: t.weiter, asUser: true })
+    if (r.drop !== undefined) $.ui.toast(t.nichtGesendet(r.drop))
+  } catch (err) {
+    $.ui.toast(t.nichtGesendet(err instanceof Error ? err.message : String(err)))
   } finally {
     if (s) freigeben(s)
   }
@@ -943,10 +966,11 @@ export const register: Register = on => {
       const r = sperre()
       if (r) return $.ui.toast(t.unterwegs[r])
       const s = sperren('compact')
-      const befehl = compactBefehl ?? compactAus(await letzteAntwort($).catch(() => ''))
+      const antwort = await letzteAntwort($).catch(() => '')
+      const befehl = compactBefehl ?? compactAus(antwort)
       // Not awaited: a press has 10 s, a compaction takes longer (2026-11-03 "ui.press hook
       // skipped: ran past its 10s budget"). The engine lets work a press leaves running finish.
-      void komprimieren($, befehl, s, spr)
+      void komprimieren($, befehl, s, spr, gehtWeiter(antwort, wahl !== null))
     }
 
     // As with the review: nothing stored, the press reads the last answer itself.

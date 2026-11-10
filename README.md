@@ -66,7 +66,7 @@ A Claude Code mod that reads the last answer after every turn and highlights the
 | **Model + Effort** | always; highlighted after a `**Next:**` hint | runs the hint's `/compact` (if any), `/model`, `/effort`, then sends the order to carry out the plan |
 | **↺** | after a switch | restores the model and effort from before the first switch |
 | **Review** | always; highlighted after a `REVIEW RECOMMENDATION` | sends *"Start review"* with the recommended commits; a subagent reviews, the session fixes |
-| **Compact** | always; highlighted after a compact hint | compacts with the instructions from the last `/compact` line |
+| **Compact** | always; highlighted after a compact hint | compacts with the instructions from the last `/compact` line; pressed right after a compact hint, it then sends the order to continue (not while a model switch is pending) |
 | **Live** | if the repo has `scripts/merge.ps1` | sends *"Release to production"*; the project's `CLAUDE.md` defines what that means |
 | **⚡** | if the repo has `.claude/working-mode` | toggles careful mode and fast mode for all sessions |
 | **🏋** | if the repo has `.claude/hooks/sperren.mjs` | switches the session lock "schwerlast" (type check, full tests: one session at a time) off or on **for this machine only**, by writing the untracked `.claude/sperren.local` itself; highlighted = lock off |
