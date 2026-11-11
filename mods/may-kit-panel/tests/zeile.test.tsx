@@ -386,7 +386,7 @@ test('a prompt goes out with the line naming model and effort beside it', async 
   await $.prompt.submit({ text: 'Fix the bug', wait: false, origin: { kind: 'composer' } })
   expect(gesehen.at(-1)?.text).toBe('Fix the bug')
   expect(gesehen.at(-1)?.context?.at(-1)).toBe(
-    'may-kit: running Opus high. A turn that changes files starts with the **Model:** line (CLAUDE.md §3). Same model → carry on, no **Next:**.',
+    'may-kit: running Opus high. A turn that changes files starts with the **Model:** line (CLAUDE.md §3). Same model → carry on, no **Next:**. At a cut point end with **Compact now:** (§3a); a review recommendation or an open question does not block it.',
   )
 })
 

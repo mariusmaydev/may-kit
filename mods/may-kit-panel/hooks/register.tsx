@@ -592,12 +592,13 @@ async function laufendLesen($: Dollar): Promise<Vorher | null> {
 /**
  * The line the panel puts beside each prompt, unseen by the person (CLAUDE.md §3 "Compare before you
  * recommend"): the system prompt names the model, but nothing names the effort, and a guessed one made
- * Claude stop with "**Next:**" for nothing. About 30 tokens, behind the prompt: no extra request, the
+ * Claude stop with "**Next:**" for nothing. Since 2026-11-11 it also reminds of the compaction hint at a
+ * cut point (§3a), which a review recommendation used to block for good. About 55 tokens, behind the prompt: no extra request, the
  * prompt cache stays.
  */
 export function kontextZeile(aktuell: Vorher | null): string {
   const lauf = aktuell ? `running ${modellKurz(aktuell.modell)}${aktuell.effort ? ` ${aktuell.effort}` : ''}. ` : ''
-  return `may-kit: ${lauf}A turn that changes files starts with the **Model:** line (CLAUDE.md §3). Same model → carry on, no **Next:**.`
+  return `may-kit: ${lauf}A turn that changes files starts with the **Model:** line (CLAUDE.md §3). Same model → carry on, no **Next:**. At a cut point end with **Compact now:** (§3a); a review recommendation or an open question does not block it.`
 }
 
 /** What the session runs on now: the last request's, else /model and the effort setting; null if unreadable. */

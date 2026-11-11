@@ -423,7 +423,7 @@ test('the override file: the button switches only schwerlast', () => {
 
 // 2026-11-08: the line beside each prompt names model and effort, so Claude can tell "stays" from a switch.
 test('the prompt line names the running model and effort, or only the rule', () => {
-  const regel = 'A turn that changes files starts with the **Model:** line (CLAUDE.md §3). Same model → carry on, no **Next:**.'
+  const regel = 'A turn that changes files starts with the **Model:** line (CLAUDE.md §3). Same model → carry on, no **Next:**. At a cut point end with **Compact now:** (§3a); a review recommendation or an open question does not block it.'
   expect(kontextZeile({ modell: 'claude-opus-5-5', effort: 'high' })).toBe(`may-kit: running Opus high. ${regel}`)
   expect(kontextZeile({ modell: 'sonnet', effort: null })).toBe(`may-kit: running Sonnet. ${regel}`)
   expect(kontextZeile(null)).toBe(`may-kit: ${regel}`)

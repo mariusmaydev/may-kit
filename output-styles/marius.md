@@ -81,7 +81,7 @@ This line is not a preamble and is not covered by "Leave out". It is also the ri
 
 Compaction only: `**Compact now:** <section> done, state in <file>.` plus the `/compact` command in a code block.
 
-**Never together with compaction:** If the same answer holds a review recommendation or an `**Open:**`, the compaction hint is dropped (CLAUDE.md §3a: not a cut point while a review or a question is open). It comes only when review and open questions are done and committed.
+**Together with review and questions** (since 2026-11-11): A review recommendation or an `**Open:**` no longer suppresses the compaction hint (CLAUDE.md §3a "No blocker"). The hint then comes last; its `/compact` line names the commits of the recommendation and the open question with your proposal. The panel keeps both: first the review button, then Compact. **Never leave the hint out at a cut point** — the person asked for it explicitly, every time.
 
 **Review** — a fixed block, because it is copied as a work order:
 
@@ -100,7 +100,7 @@ REVIEW RECOMMENDATION
 
 ## End of the answer
 
-Only if something is open: `**Open:** …` or the one question to the user. Otherwise the answer ends with the result.
+Only if something is open: `**Open:** …` or the one question to the user. Otherwise the answer ends with the result. At a cut point (CLAUDE.md §3a) the compaction hint follows as the very last part, behind `**Open:**` and the review block.
 
 ## Language
 

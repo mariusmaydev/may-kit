@@ -103,13 +103,18 @@ Without such a model, only the trigger list from §1 applies.
 
 Compaction happens at a **section boundary**, not at a token count. Goal: the next section starts with everything it needs — and without the ballast of the previous one.
 
+**Never skip the hint** (user instruction 2026-11-11: "always, everywhere"): every answer that reaches a cut point ends with it — in every project, in every working mode, also behind a review recommendation or an open question. A missing hint is the most frequent fault of this section: in mode `fast` every stage ends with a review recommendation, and as long as that blocked the hint, it practically never came.
+
 **Cut points** — then give the hint:
 - Plan approved, implementation begins. The exploration has served its purpose; the implementation needs only the plan.
-- Stage or task done: verified, committed, state documented.
+- Stage or task done: verified (or committed in mode `fast`), state documented — also when a review recommendation follows.
+- Review findings fixed and committed.
 - Bug hunt finished: cause and fix are settled, nobody needs the traces of the search any more.
 - Change of topic: the new task has nothing to do with the previous one → `/clear` instead of `/compact`.
 
-**Not a cut point** as long as: own changes are unsaved · a question or approval is open · a background run is working · a review is pending that refers to code just read · the next step builds directly on what was just read and re-reading costs more than it saves.
+**Not a cut point** as long as: own changes are unsaved · a background run is working (a review subagent, a long test) · the next step builds directly on what was just read and re-reading costs more than it saves.
+
+**No blocker** (since 2026-11-11): a review recommendation in the same answer — the review runs in a fresh subagent on the commit SHAs and needs nothing from the session, the `/compact` command carries the `Commits:` line · an open question or approval — it goes into the command with the own proposal (`open: …`), unless answering it needs the material just read.
 
 **Secure first** — what is still needed belongs in files, not in the summary: plan → plan file (§2) · state → spec or docs · decisions → decision log or spec · environment pitfalls → error catalog or project memory.
 
@@ -126,7 +131,7 @@ Compaction happens at a **section boundary**, not at a token count. Goal: the ne
 ```
 ````
 
-The command always stands in a code block of its own, so it can be copied, and stays short (at most about ten lines); anything longer belongs in a file. If compaction and a model switch (§3) coincide, they become **one** "Next:" hint per §3: **first `/compact`, then `/model`** — so the stronger model still writes the summary.
+The command always stands in a code block of its own, so it can be copied, and stays on **one line** (the panel's Compact button reads only that line); anything longer belongs in a file. With a review recommendation or an `**Open:**` in the same answer, the hint comes last, after them. If compaction and a model switch (§3) coincide, they become **one** "Next:" hint per §3: **first `/compact`, then `/model`** — so the stronger model still writes the summary.
 
 ---
 
@@ -198,4 +203,4 @@ The MCP server `chrome-devtools` (user scope, `~/.claude.json`) hangs on **one**
 
 ---
 
-*Created 2026-09-03, tightened 2026-11-02, §3a compaction 2026-11-03, §3 model line before every implementation 2026-11-03, English with language-neutral markers 2026-11-03, §3 same model stays, effort from the panel's prompt line, Stop hook removed 2026-11-08.*
+*Created 2026-09-03, tightened 2026-11-02, §3a compaction 2026-11-03, §3 model line before every implementation 2026-11-03, English with language-neutral markers 2026-11-03, §3 same model stays, effort from the panel's prompt line, Stop hook removed 2026-11-08, §3a hint never skipped, review and open question no blocker 2026-11-11.*
