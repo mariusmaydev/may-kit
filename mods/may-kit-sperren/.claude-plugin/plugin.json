@@ -1,0 +1,6 @@
+{
+  "name": "may-kit-sperren",
+  "version": "1.0.0",
+  "description": "Locks between parallel Claude sessions on one working tree: only work that really collides waits, each area as narrow as possible",
+  "author": { "name": "Marius May" }
+}

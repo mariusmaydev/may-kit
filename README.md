@@ -15,6 +15,7 @@ Out of the box, Claude Code leaves the process up to the model: it may plan a on
 | [`CLAUDE.md`](CLAUDE.md) | Global working rules: planning triggers, model choice, compaction, review |
 | [`output-styles/marius.md`](output-styles/marius.md) | How Claude answers: result first, short, every hint in a fixed shape |
 | [`mods/may-kit-panel`](mods/may-kit-panel) | A row of buttons above the prompt that reads those hints and runs them |
+| [`mods/may-kit-sperren`](mods/may-kit-sperren/hooks/sperren.mjs) | Locks between parallel sessions on one working tree — only work that really collides waits (opt-in per repo: `.claude/sperren` starting with `an`) |
 
 ## How it works
 
